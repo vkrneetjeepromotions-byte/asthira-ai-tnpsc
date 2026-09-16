@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#182a70">
+<title>ASTHIRA AI – TNPSC MCQ Creator</title>
+<link rel="manifest" href="manifest.json">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f4f6fb;color:#182033}
+header{background:#182a70;color:white;padding:20px 16px;text-align:center}
+header h1{margin:0;font-size:24px}header p{margin:7px 0 0;font-size:13px}
+main{max-width:700px;margin:auto;padding:16px}.card{background:white;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 3px 14px #00000010}
+label{display:block;font-weight:700;margin:12px 0 6px}select,input,button{width:100%;padding:13px;border-radius:10px;border:1px solid #ccd2df;font-size:15px}
+button{border:0;background:#182a70;color:white;font-weight:700;margin-top:14px}.upload{border:2px dashed #9da9c5;text-align:center;padding:22px;border-radius:12px}
+#file{display:none}.muted{color:#697386;font-size:13px}.result{white-space:pre-wrap;line-height:1.55;font-size:15px}
+.loading{display:none;text-align:center;padding:15px}.spinner{display:inline-block;width:22px;height:22px;border:3px solid #ccd2df;border-top-color:#182a70;border-radius:50%;animation:s 1s linear infinite;vertical-align:middle;margin-right:8px}@keyframes s{to{transform:rotate(360deg)}}
+footer{text-align:center;color:#697386;font-size:12px;padding:20px}
+</style>
+</head>
+<body>
+<header><h1>ASTHIRA AI</h1><p>TNPSC AI QUESTION PAPER CREATOR</p></header>
+<main>
+<div class="card">
+<h2 style="margin-top:0">Create MCQs from your material</h2>
+<div class="upload" onclick="document.getElementById('file').click()">
+  <div style="font-size:34px">📄</div><b id="fileName">Upload PDF / Image</b>
+  <div class="muted">Tap here to select your study material</div>
+</div>
+<input id="file" type="file" accept=".pdf,.png,.jpg,.jpeg">
+<label>Exam</label><select id="exam"><option>TNPSC Group 1</option><option selected>TNPSC Group 2</option><option>TNPSC Group 2A</option><option>TNPSC Group 4</option><option>TNUSRB SI</option></select>
+<label>Subject</label><select id="subject"><option>Indian Polity</option><option>Indian History</option><option>Tamil Nadu History</option><option>Geography</option><option>Economy</option><option>Tamil</option><option>Science</option></select>
+<label>Topic (optional)</label><input id="topic" placeholder="Example: Fundamental Rights">
+<label>Difficulty</label><select id="difficulty"><option>Easy</option><option>Moderate</option><option>Tough</option><option selected>Very Tough</option></select>
+<label>Language</label><select id="language"><option selected>Tamil</option><option>English</option><option>Bilingual</option></select>
+<label>Question type</label><select id="type"><option selected>MCQ</option><option>Assertion-Reason</option><option>Statement Based</option><option>Match the Following</option></select>
+<label>Number of questions</label><select id="count"><option>10</option><option>20</option><option>25</option><option>50</option><option>100</option><option>200</option></select>
+<button onclick="generate()">🤖 GENERATE MCQs</button>
+<div class="loading" id="loading"><span class="spinner"></span>AI is preparing your questions...</div>
+</div>
+<div class="card" id="resultCard" style="display:none"><h2>Generated Questions</h2><div id="result" class="result"></div></div>
+</main>
+<footer>ASTHIRA COACHING INSTITUTE<br>Exclusive centre for all competitive exam.</footer>
+<script>
+const API_URL=""; // Set to your production backend URL after backend hosting.
+document.getElementById('file').onchange=e=>{
+ const f=e.target.files[0]; if(f) document.getElementById('fileName').textContent=f.name;
+};
+async function generate(){
+ const f=document.getElementById('file').files[0];
+ if(!f){alert("Please upload a PDF or image first.");return}
+ const loading=document.getElementById('loading'); loading.style.display='block';
+ try{
+  const fd=new FormData();
+  fd.append('file',f);
+  ['exam','subject','topic','difficulty','language','type','count'].forEach(k=>{
+    const id=k==='type'?'type':k; fd.append(k,document.getElementById(id).value);
+  });
+  const r=await fetch(API_URL+'/ai/generate',{method:'POST',body:fd});
+  const text=await r.text();
+  if(!r.ok) throw new Error(text);
+  const d=JSON.parse(text);
+  document.getElementById('result').textContent=d.content||'No output';
+  document.getElementById('resultCard').style.display='block';
+ }catch(e){alert("Backend is not connected yet. The website is ready; we need to connect the AI server next.");}
+ finally{loading.style.display='none'}
+}
+</script>
+</body></html>
