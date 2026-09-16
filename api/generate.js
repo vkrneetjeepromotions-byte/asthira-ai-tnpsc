@@ -187,7 +187,7 @@ Return ONLY JSON matching the schema.
             schema
           }
         },
-        max_output_tokens: Math.min(50000, Math.max(5000, n * 360)),
+        max_output_tokens: Math.min(50000, Math.max(8000, n * 600)),
         store: false
       })
     });
@@ -227,9 +227,19 @@ Return ONLY JSON matching the schema.
     try {
       result = JSON.parse(outputText);
     } catch (e) {
-      return res.status(500).json({
-        error: "OpenAI returned invalid JSON."
-      });
+      const cleaned = outputText
+        .replace(/^\s*```json\s*/i, "")
+        .replace(/^\s*```\s*/i, "")
+        .replace(/\s*```\s*$/i, "")
+        .trim();
+      try {
+        result = JSON.parse(cleaned);
+      } catch (e2) {
+        return res.status(500).json({
+          error: "OpenAI returned incomplete or invalid JSON. Please generate again.",
+          finishReason: data?.incomplete_details?.reason || data?.status || "unknown"
+        });
+      }
     }
 
     if (!Array.isArray(result.questions) || result.questions.length !== n) {
