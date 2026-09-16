@@ -27,37 +27,33 @@ export default async function handler(req, res) {
     const n = Math.max(1, Math.min(200, Number(count) || 10));
 
     const instructions = `
-You are ASTHIRA AI, an expert TNPSC competitive-exam question setter.
+You are ASTHIRA AI, an expert TNPSC competitive examination question setter.
 
-Generate exactly ${n} high-quality questions for:
+Generate exactly ${n} high-quality questions.
+
 Exam: ${exam}
 Subject: ${subject}
-Topic: ${topic || "As specified in the uploaded material"}
+Topic: ${topic || "General"}
 Difficulty: ${difficulty}
 Language: ${language}
 Question type: ${questionType}
 
-Follow TNPSC-style standards.
-Questions must be factually accurate, unambiguous and exam-oriented.
-Use the uploaded study material as the primary source when provided.
-Do not invent facts.
+Rules:
+- Follow TNPSC examination standards.
+- Questions must be factually accurate.
+- Avoid ambiguous questions.
+- Use the uploaded study material as the primary source when provided.
+- Do not invent facts.
+- Give exactly 4 options for every question.
+- Give the correct answer.
+- Give a concise explanation.
 
-For every question provide:
-- question
-- exactly 4 options
-- answer
-- concise explanation
-
-For Assertion-Reason questions, use standard Assertion and Reason format.
-For Statement Based questions, clearly label statements.
-For Match the Following, provide appropriate matching options.
-
-Language rules:
+Language:
 Tamil = Tamil only.
 English = English only.
-Bilingual = Tamil + English.
+Bilingual = Tamil and English.
 
-Return ONLY the requested structured JSON.
+Return only the requested JSON structure.
 `;
 
     const content = [];
@@ -88,65 +84,92 @@ Return ONLY the requested structured JSON.
       text: instructions
     });
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-5.6-luna",
-        instructions,
-        input: [
-          {
-            role: "user",
-            content
-          }
-        ],
-        text: {
-          format: {
-            type: "json_schema",
-            name: "tnpsc_mcqs",
-            strict: true,
-            schema: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                questions: {
-                  type: "array",
-                  minItems: n,
-                  maxItems: n,
-                  items: {
-                    type: "object",
-                    additionalProperties: false,
-                    properties: {
-                      question: { type: "string" },
-                      options: {
-                        type: "array",
-                        minItems: 4,
-                        maxItems: 4,
-                        items: { type: "string" }
-                      },
-                      answer: { type: "string" },
-                      explanation: { type: "string" }
-                    },
-                    required: [
-                      "question",
-                      "options",
-                      "answer",
-                      "explanation"
-                    ]
-                  }
-                }
-              },
-              required: ["questions"]
-            }
-          }
+    const response = await fetch(
+      "https://api.openai.com/v1/responses",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
         },
-        max_output_tokens: Math.min(50000, Math.max(5000, n * 250)),
-        store: false
-      })
-    });
+        body: JSON.stringify({
+          model: "gpt-5.6-luna",
+
+          instructions,
+
+          input: [
+            {
+              role: "user",
+              content
+            }
+          ],
+
+          text: {
+            format: {
+              type: "json_schema",
+              name: "tnpsc_mcqs",
+              strict: true,
+              schema: {
+                type: "object",
+                additionalProperties: false,
+
+                properties: {
+                  questions: {
+                    type: "array",
+                    minItems: n,
+                    maxItems: n,
+
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+
+                      properties: {
+                        question: {
+                          type: "string"
+                        },
+
+                        options: {
+                          type: "array",
+                          minItems: 4,
+                          maxItems: 4,
+                          items: {
+                            type: "string"
+                          }
+                        },
+
+                        answer: {
+                          type: "string"
+                        },
+
+                        explanation: {
+                          type: "string"
+                        }
+                      },
+
+                      required: [
+                        "question",
+                        "options",
+                        "answer",
+                        "explanation"
+                      ]
+                    }
+                  }
+                },
+
+                required: ["questions"]
+              }
+            }
+          },
+
+          max_output_tokens: Math.min(
+            50000,
+            Math.max(5000, n * 250)
+          ),
+
+          store: false
+        })
+      }
+    );
 
     const data = await response.json();
 
@@ -158,13 +181,43 @@ Return ONLY the requested structured JSON.
       });
     }
 
+    /*
+      Read the raw Responses API structure:
+      output → message → content → output_text → text
+    */
+
+    let outputText = "";
+
+    if (Array.isArray(data.output)) {
+      for (const item of data.output) {
+        if (item.type === "message" && Array.isArray(item.content)) {
+          for (const part of item.content) {
+            if (
+              part.type === "output_text" &&
+              typeof part.text === "string"
+            ) {
+              outputText += part.text;
+            }
+          }
+        }
+      }
+    }
+
+    if (!outputText) {
+      return res.status(500).json({
+        error: "OpenAI returned no text output.",
+        status: data.status || "unknown"
+      });
+    }
+
     let result;
 
-    if (data.output_text) {
-      result = JSON.parse(data.output_text);
-    } else {
+    try {
+      result = JSON.parse(outputText);
+    } catch (parseError) {
       return res.status(500).json({
-        error: "No structured output received from OpenAI."
+        error: "OpenAI returned invalid JSON.",
+        details: parseError.message
       });
     }
 
