@@ -37,7 +37,10 @@ input[type=file]{display:none}
 .tool{border:1px solid #cbd2df;background:#fff;border-radius:10px;padding:10px 12px;font-weight:700}
 .tool:hover{background:#f0f3fa}
 .answerKey{display:none}
+.pdf-main{font-weight:800}
+.pdf-help{display:none;background:#eef3ff;border-left:4px solid #172b70;padding:9px 11px;border-radius:8px;margin:8px 0;font-size:13px}
 .notice{background:#f7f8fc;border-left:4px solid #172b70;padding:10px 12px;border-radius:8px;margin-top:12px;font-size:13px}
+.print-meta{display:none}
 @media(max-width:650px){.grid{grid-template-columns:1fr}header h1{font-size:26px}}
 @media print{
   body{background:#fff;font-size:11pt}
@@ -47,12 +50,19 @@ input[type=file]{display:none}
   header p{font-size:9pt}
   main{max-width:none;margin:0;padding:0}
   .card{box-shadow:none;padding:8px;border-radius:0}
-  .builder,.toolbar,.status,.notice{display:none!important}
+  .builder,.toolbar,.status,.notice,.pdf-help{display:none!important}
   .results{display:block!important}
+  .results>h2{font-size:16pt;margin:3mm 0 2mm}
+  .small{font-size:9pt;color:#333;margin-bottom:3mm}
   #questions{column-count:2;column-gap:24px}
-  .q{border:0;border-bottom:1px solid #ddd;border-radius:0;padding:7px 0;margin:0 0 9px}
-  .exp{color:#333}
+  .q{border:0;border-bottom:1px solid #ddd;border-radius:0;padding:6px 0;margin:0 0 8px;break-inside:avoid}
+  .qnum{font-size:10.5pt}
+  .opt{font-size:10pt;padding:3px 0}
+  .ans{font-size:10pt;margin-top:6px}
+  .exp{font-size:9.5pt;color:#333;line-height:1.35}
   .answerKey{display:block!important;break-before:page}
+  .answerKey h2{font-size:16pt}
+  .answerKey .q{border-bottom:1px solid #ddd}
   @page{size:A4;margin:14mm 12mm}
 }
 body.questions-only-print .ans,body.questions-only-print .exp{display:none}
@@ -165,7 +175,7 @@ function render(qs){
   }).join("");
 
   $("answerKey").innerHTML="<h2>Answer Key</h2>"+lastQuestions.map((q,i)=>
-    `<div class="q"><b>${i+1}.</b> ${esc(q.answer)}</div>`
+    `<div class="q"><b>${i+1}.</b> <b>${esc(q.answerLetter||"")}</b> — ${esc(q.answer)}</div>`
   ).join("");
 
   $("results").style.display="block";
@@ -201,7 +211,9 @@ $("generate").onclick=async()=>{
     if(!r.ok)throw Error(d.error||"Generation failed");
     render(d.questions||[]);
     $("resultMeta").textContent=`${d.questions.length} questions • ${p.exam} • ${p.subject} • ${p.difficulty} • ${p.questionType}`;
+    document.title=`ASTHIRA AI - ${p.exam} - ${p.subject} - ${d.questions.length} Questions`;
     status("Done ✓");
+    $("pdf-help").style.display="block";
   }catch(e){
     status(e.message||"Something went wrong.",true);
   }finally{$("generate").disabled=false;}
@@ -212,8 +224,9 @@ function doPrint(mode){
   if(mode==="questions")document.body.classList.add("questions-only-print");
   if(mode==="answers")document.body.classList.add("answer-only-print");
   window.print();
-  setTimeout(()=>document.body.classList.remove("questions-only-print","answer-only-print"),500);
+  setTimeout(()=>document.body.classList.remove("questions-only-print","answer-only-print"),800);
 }
+function savePDF(){doPrint("full")}
 function printFull(){doPrint("full")}
 function printQuestions(){doPrint("questions")}
 function printAnswers(){doPrint("answers")}
