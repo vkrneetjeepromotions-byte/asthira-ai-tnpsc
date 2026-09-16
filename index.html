@@ -1,43 +1,219 @@
-<!doctype html><html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#172b70"><title>ASTHIRA AI – TNPSC MCQ Creator</title>
+<!doctype html>
+<html lang="ta">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#172b70">
+<title>ASTHIRA AI – TNPSC MCQ Creator</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:Arial;background:#f4f6fb;color:#172033}
-header{background:#172b70;color:#fff;text-align:center;padding:22px 16px}header h1{margin:0;font-size:30px}header p{margin:7px 0 0}
-main{max-width:900px;margin:18px auto;padding:0 14px}.card{background:#fff;border-radius:18px;padding:20px;box-shadow:0 4px 18px #00000012}
-h2{margin:0 0 18px;font-size:26px}label{display:block;font-weight:700;margin:14px 0 7px}
-input,select,button{font:inherit}select,input{width:100%;padding:13px 14px;border:1px solid #ccd2df;border-radius:12px;background:#fff}
-.drop{border:2px dashed #aeb8ca;border-radius:15px;padding:28px 14px;text-align:center;cursor:pointer;margin-bottom:14px}
-.drop strong{display:block;font-size:18px}.drop span{display:block;color:#70798a;margin-top:6px}input[type=file]{display:none}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.primary{width:100%;border:0;border-radius:13px;padding:15px;margin-top:20px;background:#172b70;color:#fff;font-weight:700;font-size:17px}
-.primary:disabled{opacity:.55}.status{margin-top:14px;padding:12px;border-radius:12px;background:#eef2ff;display:none}
-.results{margin-top:18px;display:none}.q{border:1px solid #e0e4ec;border-radius:14px;padding:15px;margin:12px 0}
-.qnum{font-weight:700;margin-bottom:8px}.opt{padding:5px 0}.ans{margin-top:10px;font-weight:700}.exp{margin-top:6px;color:#5c6575}
-.small{font-size:13px;color:#687284}.error{background:#fff0f0;color:#a40000}@media(max-width:650px){.grid{grid-template-columns:1fr}header h1{font-size:26px}}
-</style></head><body>
-<header><h1>ASTHIRA AI</h1><p>TNPSC AI QUESTION PAPER CREATOR</p></header>
-<main><section class="card"><h2>Create MCQs from your material</h2>
-<label class="drop" for="material"><strong>📄 Upload PDF / Image</strong><span id="fileLabel">Tap here to select your study material</span></label>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,"Noto Sans Tamil",sans-serif;background:#f4f6fb;color:#172033}
+header{background:#172b70;color:#fff;text-align:center;padding:20px 14px}
+header h1{margin:0;font-size:29px;text-decoration:underline}
+header p{margin:7px 0 0;font-size:14px}
+main{max-width:950px;margin:18px auto;padding:0 14px}
+.card{background:#fff;border-radius:18px;padding:20px;box-shadow:0 4px 18px #00000012}
+h2{margin:0 0 18px;font-size:25px}
+label{display:block;font-weight:700;margin:14px 0 7px}
+input,select,button{font:inherit}
+select,input{width:100%;padding:13px 14px;border:1px solid #ccd2df;border-radius:12px;background:#fff}
+.drop{border:2px dashed #aeb8ca;border-radius:15px;padding:25px 14px;text-align:center;cursor:pointer;margin-bottom:14px}
+.drop strong{display:block;font-size:18px}.drop span{display:block;color:#70798a;margin-top:6px}
+input[type=file]{display:none}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.primary{width:100%;border:0;border-radius:13px;padding:15px;margin-top:20px;background:#172b70;color:#fff;font-weight:700;font-size:17px}
+.primary:disabled{opacity:.55}
+.status{margin-top:14px;padding:12px;border-radius:12px;background:#eef2ff;display:none}
+.results{margin-top:18px;display:none}
+.q{border:1px solid #e0e4ec;border-radius:14px;padding:15px;margin:12px 0;break-inside:avoid}
+.qnum{font-weight:700;margin-bottom:9px;line-height:1.5}
+.opt{padding:5px 0;line-height:1.5}
+.ans{margin-top:10px;font-weight:700}
+.exp{margin-top:6px;color:#5c6575;line-height:1.5}
+.small{font-size:13px;color:#687284}
+.error{background:#fff0f0;color:#a40000}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:15px 0}
+.tool{border:1px solid #cbd2df;background:#fff;border-radius:10px;padding:10px 12px;font-weight:700}
+.tool:hover{background:#f0f3fa}
+.answerKey{display:none}
+.notice{background:#f7f8fc;border-left:4px solid #172b70;padding:10px 12px;border-radius:8px;margin-top:12px;font-size:13px}
+@media(max-width:650px){.grid{grid-template-columns:1fr}header h1{font-size:26px}}
+@media print{
+  body{background:#fff;font-size:11pt}
+  header{background:#fff;color:#172b70;padding:8px 0;border-bottom:2px solid #172b70}
+  header h1{font-size:20pt}
+  header p{font-size:9pt}
+  main{max-width:none;margin:0;padding:0}
+  .card{box-shadow:none;padding:8px;border-radius:0}
+  .builder,.toolbar,.status,.notice{display:none!important}
+  .results{display:block!important}
+  #questions{column-count:2;column-gap:24px}
+  .q{border:0;border-bottom:1px solid #ddd;border-radius:0;padding:7px 0;margin:0 0 9px}
+  .exp{color:#333}
+  .answerKey{display:block!important;break-before:page}
+  @page{size:A4;margin:14mm 12mm}
+}
+body.questions-only-print .ans,body.questions-only-print .exp{display:none}
+body.answer-only-print .q{display:none}
+body.answer-only-print .answerKey{display:block!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>ASTHIRA COACHING INSTITUTE</h1>
+  <p>Exclusive Centre for All Competitive Exams • ASTHIRA AI – TNPSC QUESTION PAPER CREATOR</p>
+</header>
+
+<main>
+<section class="card builder">
+<h2>✨ Create TNPSC Questions</h2>
+
+<label class="drop" for="material">
+  <strong>📄 Upload PDF / Image</strong>
+  <span id="fileLabel">Tap here to select your study material</span>
+</label>
 <input id="material" type="file" accept=".pdf,image/*">
-<div class="grid"><div><label>Exam</label><select id="exam"><option>TNPSC Group 1</option><option selected>TNPSC Group 2</option><option>TNPSC Group 2A</option><option>TNPSC Group 4</option><option>TNUSRB SI</option></select></div>
-<div><label>Subject</label><select id="subject"><option selected>Indian Polity</option><option>History</option><option>Tamil Nadu History</option><option>Geography</option><option>Economy</option><option>Tamil</option><option>Science</option></select></div></div>
-<label>Topic (optional)</label><input id="topic" placeholder="Example: Fundamental Rights">
-<div class="grid"><div><label>Difficulty</label><select id="difficulty"><option>Easy</option><option>Moderate</option><option>Tough</option><option selected>Very Tough</option></select></div>
-<div><label>Language</label><select id="language"><option selected>Tamil</option><option>English</option><option>Bilingual</option></select></div></div>
-<div class="grid"><div><label>Question type</label><select id="qtype"><option selected>MCQ</option><option>Assertion-Reason</option><option>Statement Based</option><option>Match the Following</option></select></div>
-<div><label>Number of questions</label><select id="count"><option>10</option><option>20</option><option>25</option><option selected>50</option><option>100</option><option>200</option></select></div></div>
-<button id="generate" class="primary">✨ Generate MCQs</button><div id="status" class="status"></div></section>
-<section id="results" class="card results"><h2>Generated Questions</h2><div id="resultMeta" class="small"></div><div id="questions"></div></section></main>
+
+<div class="grid">
+<div><label>Exam</label>
+<select id="exam">
+<option>TNPSC Group 1</option><option selected>TNPSC Group 2</option>
+<option>TNPSC Group 2A</option><option>TNPSC Group 4</option><option>TNUSRB SI</option>
+</select></div>
+<div><label>Subject</label>
+<select id="subject">
+<option selected>Indian Polity</option><option>History</option><option>Tamil Nadu History</option>
+<option>Geography</option><option>Economy</option><option>Tamil</option><option>Science</option>
+</select></div>
+</div>
+
+<label>Topic (optional)</label>
+<input id="topic" placeholder="Example: Fundamental Rights">
+
+<div class="grid">
+<div><label>Difficulty</label>
+<select id="difficulty"><option>Easy</option><option>Moderate</option><option>Tough</option><option selected>Very Tough</option></select></div>
+<div><label>Language</label>
+<select id="language"><option selected>Tamil</option><option>English</option><option>Bilingual</option></select></div>
+</div>
+
+<div class="grid">
+<div><label>Question type</label>
+<select id="qtype">
+<option selected>MCQ</option><option>Assertion-Reason</option><option>Statement Based</option><option>Match the Following</option>
+</select></div>
+<div><label>Number of questions</label>
+<select id="count">
+<option>10</option><option>20</option><option>25</option><option selected>50</option><option>100</option><option>200</option>
+</select></div>
+</div>
+
+<button id="generate" class="primary">✨ Generate TNPSC Questions</button>
+<div id="status" class="status"></div>
+<div class="notice">Tip: Upload your study material when you want questions to be based primarily on that material.</div>
+</section>
+
+<section id="results" class="card results">
+<h2>Generated Question Paper</h2>
+<div id="resultMeta" class="small"></div>
+
+<div class="toolbar">
+<button class="tool" onclick="printFull()">📥 Full PDF</button>
+<button class="tool" onclick="printQuestions()">📝 Question Paper</button>
+<button class="tool" onclick="printAnswers()">🔑 Answer Key</button>
+</div>
+
+<div id="questions"></div>
+<div id="answerKey" class="answerKey"></div>
+</section>
+</main>
+
 <script>
-const $=id=>document.getElementById(id);let selectedFile=null;
-$("material").onchange=e=>{selectedFile=e.target.files[0]||null;$("fileLabel").textContent=selectedFile?selectedFile.name:"Tap here to select your study material"};
-function status(m,e=false){$("status").style.display="block";$("status").className="status"+(e?" error":"");$("status").textContent=m}
-function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]))}
-function render(qs){$("questions").innerHTML=qs.map((q,i)=>`<article class="q"><div class="qnum">${i+1}. ${esc(q.question)}</div>${(q.options||[]).map((o,j)=>`<div class="opt"><b>${String.fromCharCode(65+j)}.</b> ${esc(o)}</div>`).join("")}<div class="ans">Answer: ${esc(q.answer)}</div><div class="exp">${esc(q.explanation)}</div></article>`).join("");$("results").style.display="block"}
-function dataURL(f){return new Promise((ok,no)=>{let r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(f)})}
-$("generate").onclick=async()=>{let n=+$("count").value;if(selectedFile&&selectedFile.size>3*1024*1024)return status("For this mobile version, please use a PDF/image under 3 MB.",true);
-$("generate").disabled=true;status("Generating high-quality TNPSC questions…");$("results").style.display="none";
-try{let fd=selectedFile?await dataURL(selectedFile):null;let p={exam:$("exam").value,subject:$("subject").value,topic:$("topic").value.trim(),difficulty:$("difficulty").value,language:$("language").value,questionType:$("qtype").value,count:n,fileName:selectedFile?.name||"",fileData:fd};
-let r=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});let d=await r.json();if(!r.ok)throw Error(d.error||"Generation failed");render(d.questions||[]);$("resultMeta").textContent=`${d.questions.length} questions • ${p.exam} • ${p.subject} • ${p.difficulty}`;status("Done ✓")
-}catch(e){status(e.message||"Something went wrong.",true)}finally{$("generate").disabled=false}};
-</script></body></html>
+const $=id=>document.getElementById(id);
+let selectedFile=null;
+
+$("material").onchange=e=>{
+  selectedFile=e.target.files[0]||null;
+  $("fileLabel").textContent=selectedFile?selectedFile.name:"Tap here to select your study material";
+};
+
+function status(m,e=false){
+  $("status").style.display="block";
+  $("status").className="status"+(e?" error":"");
+  $("status").textContent=m;
+}
+
+function esc(s){
+  return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
+}
+
+let lastQuestions=[];
+
+function render(qs){
+  lastQuestions=qs||[];
+  $("questions").innerHTML=lastQuestions.map((q,i)=>{
+    const opts=(q.options||[]).map((o,j)=>`<div class="opt"><b>${String.fromCharCode(65+j)}.</b> ${esc(o)}</div>`).join("");
+    return `<article class="q">
+      <div class="qnum">${i+1}. ${esc(q.question)}</div>
+      ${opts}
+      <div class="ans">Answer: ${esc(q.answer)}</div>
+      <div class="exp">${esc(q.explanation)}</div>
+    </article>`;
+  }).join("");
+
+  $("answerKey").innerHTML="<h2>Answer Key</h2>"+lastQuestions.map((q,i)=>
+    `<div class="q"><b>${i+1}.</b> ${esc(q.answer)}</div>`
+  ).join("");
+
+  $("results").style.display="block";
+  window.scrollTo({top:$("results").offsetTop-10,behavior:"smooth"});
+}
+
+function dataURL(f){
+  return new Promise((ok,no)=>{
+    let r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(f);
+  });
+}
+
+$("generate").onclick=async()=>{
+  let n=+$("count").value;
+  if(selectedFile&&selectedFile.size>3*1024*1024)
+    return status("For this mobile version, please use a PDF/image under 3 MB.",true);
+
+  $("generate").disabled=true;
+  status("Generating high-quality TNPSC questions…");
+  $("results").style.display="none";
+
+  try{
+    let fd=selectedFile?await dataURL(selectedFile):null;
+    let p={
+      exam:$("exam").value,subject:$("subject").value,topic:$("topic").value.trim(),
+      difficulty:$("difficulty").value,language:$("language").value,
+      questionType:$("qtype").value,count:n,fileName:selectedFile?.name||"",fileData:fd
+    };
+    let r=await fetch("/api/generate",{
+      method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)
+    });
+    let d=await r.json();
+    if(!r.ok)throw Error(d.error||"Generation failed");
+    render(d.questions||[]);
+    $("resultMeta").textContent=`${d.questions.length} questions • ${p.exam} • ${p.subject} • ${p.difficulty} • ${p.questionType}`;
+    status("Done ✓");
+  }catch(e){
+    status(e.message||"Something went wrong.",true);
+  }finally{$("generate").disabled=false;}
+};
+
+function doPrint(mode){
+  document.body.classList.remove("questions-only-print","answer-only-print");
+  if(mode==="questions")document.body.classList.add("questions-only-print");
+  if(mode==="answers")document.body.classList.add("answer-only-print");
+  window.print();
+  setTimeout(()=>document.body.classList.remove("questions-only-print","answer-only-print"),500);
+}
+function printFull(){doPrint("full")}
+function printQuestions(){doPrint("questions")}
+function printAnswers(){doPrint("answers")}
+</script>
+</body>
+</html>
