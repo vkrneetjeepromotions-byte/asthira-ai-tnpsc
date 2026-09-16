@@ -1,69 +1,43 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#182a70">
-<title>ASTHIRA AI – TNPSC MCQ Creator</title>
-<link rel="manifest" href="manifest.json">
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#172b70"><title>ASTHIRA AI – TNPSC MCQ Creator</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f4f6fb;color:#182033}
-header{background:#182a70;color:white;padding:20px 16px;text-align:center}
-header h1{margin:0;font-size:24px}header p{margin:7px 0 0;font-size:13px}
-main{max-width:700px;margin:auto;padding:16px}.card{background:white;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 3px 14px #00000010}
-label{display:block;font-weight:700;margin:12px 0 6px}select,input,button{width:100%;padding:13px;border-radius:10px;border:1px solid #ccd2df;font-size:15px}
-button{border:0;background:#182a70;color:white;font-weight:700;margin-top:14px}.upload{border:2px dashed #9da9c5;text-align:center;padding:22px;border-radius:12px}
-#file{display:none}.muted{color:#697386;font-size:13px}.result{white-space:pre-wrap;line-height:1.55;font-size:15px}
-.loading{display:none;text-align:center;padding:15px}.spinner{display:inline-block;width:22px;height:22px;border:3px solid #ccd2df;border-top-color:#182a70;border-radius:50%;animation:s 1s linear infinite;vertical-align:middle;margin-right:8px}@keyframes s{to{transform:rotate(360deg)}}
-footer{text-align:center;color:#697386;font-size:12px;padding:20px}
-</style>
-</head>
-<body>
+*{box-sizing:border-box}body{margin:0;font-family:Arial;background:#f4f6fb;color:#172033}
+header{background:#172b70;color:#fff;text-align:center;padding:22px 16px}header h1{margin:0;font-size:30px}header p{margin:7px 0 0}
+main{max-width:900px;margin:18px auto;padding:0 14px}.card{background:#fff;border-radius:18px;padding:20px;box-shadow:0 4px 18px #00000012}
+h2{margin:0 0 18px;font-size:26px}label{display:block;font-weight:700;margin:14px 0 7px}
+input,select,button{font:inherit}select,input{width:100%;padding:13px 14px;border:1px solid #ccd2df;border-radius:12px;background:#fff}
+.drop{border:2px dashed #aeb8ca;border-radius:15px;padding:28px 14px;text-align:center;cursor:pointer;margin-bottom:14px}
+.drop strong{display:block;font-size:18px}.drop span{display:block;color:#70798a;margin-top:6px}input[type=file]{display:none}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.primary{width:100%;border:0;border-radius:13px;padding:15px;margin-top:20px;background:#172b70;color:#fff;font-weight:700;font-size:17px}
+.primary:disabled{opacity:.55}.status{margin-top:14px;padding:12px;border-radius:12px;background:#eef2ff;display:none}
+.results{margin-top:18px;display:none}.q{border:1px solid #e0e4ec;border-radius:14px;padding:15px;margin:12px 0}
+.qnum{font-weight:700;margin-bottom:8px}.opt{padding:5px 0}.ans{margin-top:10px;font-weight:700}.exp{margin-top:6px;color:#5c6575}
+.small{font-size:13px;color:#687284}.error{background:#fff0f0;color:#a40000}@media(max-width:650px){.grid{grid-template-columns:1fr}header h1{font-size:26px}}
+</style></head><body>
 <header><h1>ASTHIRA AI</h1><p>TNPSC AI QUESTION PAPER CREATOR</p></header>
-<main>
-<div class="card">
-<h2 style="margin-top:0">Create MCQs from your material</h2>
-<div class="upload" onclick="document.getElementById('file').click()">
-  <div style="font-size:34px">📄</div><b id="fileName">Upload PDF / Image</b>
-  <div class="muted">Tap here to select your study material</div>
-</div>
-<input id="file" type="file" accept=".pdf,.png,.jpg,.jpeg">
-<label>Exam</label><select id="exam"><option>TNPSC Group 1</option><option selected>TNPSC Group 2</option><option>TNPSC Group 2A</option><option>TNPSC Group 4</option><option>TNUSRB SI</option></select>
-<label>Subject</label><select id="subject"><option>Indian Polity</option><option>Indian History</option><option>Tamil Nadu History</option><option>Geography</option><option>Economy</option><option>Tamil</option><option>Science</option></select>
+<main><section class="card"><h2>Create MCQs from your material</h2>
+<label class="drop" for="material"><strong>📄 Upload PDF / Image</strong><span id="fileLabel">Tap here to select your study material</span></label>
+<input id="material" type="file" accept=".pdf,image/*">
+<div class="grid"><div><label>Exam</label><select id="exam"><option>TNPSC Group 1</option><option selected>TNPSC Group 2</option><option>TNPSC Group 2A</option><option>TNPSC Group 4</option><option>TNUSRB SI</option></select></div>
+<div><label>Subject</label><select id="subject"><option selected>Indian Polity</option><option>History</option><option>Tamil Nadu History</option><option>Geography</option><option>Economy</option><option>Tamil</option><option>Science</option></select></div></div>
 <label>Topic (optional)</label><input id="topic" placeholder="Example: Fundamental Rights">
-<label>Difficulty</label><select id="difficulty"><option>Easy</option><option>Moderate</option><option>Tough</option><option selected>Very Tough</option></select>
-<label>Language</label><select id="language"><option selected>Tamil</option><option>English</option><option>Bilingual</option></select>
-<label>Question type</label><select id="type"><option selected>MCQ</option><option>Assertion-Reason</option><option>Statement Based</option><option>Match the Following</option></select>
-<label>Number of questions</label><select id="count"><option>10</option><option>20</option><option>25</option><option>50</option><option>100</option><option>200</option></select>
-<button onclick="generate()">🤖 GENERATE MCQs</button>
-<div class="loading" id="loading"><span class="spinner"></span>AI is preparing your questions...</div>
-</div>
-<div class="card" id="resultCard" style="display:none"><h2>Generated Questions</h2><div id="result" class="result"></div></div>
-</main>
-<footer>ASTHIRA COACHING INSTITUTE<br>Exclusive centre for all competitive exam.</footer>
+<div class="grid"><div><label>Difficulty</label><select id="difficulty"><option>Easy</option><option>Moderate</option><option>Tough</option><option selected>Very Tough</option></select></div>
+<div><label>Language</label><select id="language"><option selected>Tamil</option><option>English</option><option>Bilingual</option></select></div></div>
+<div class="grid"><div><label>Question type</label><select id="qtype"><option selected>MCQ</option><option>Assertion-Reason</option><option>Statement Based</option><option>Match the Following</option></select></div>
+<div><label>Number of questions</label><select id="count"><option>10</option><option>20</option><option>25</option><option selected>50</option><option>100</option><option>200</option></select></div></div>
+<button id="generate" class="primary">✨ Generate MCQs</button><div id="status" class="status"></div></section>
+<section id="results" class="card results"><h2>Generated Questions</h2><div id="resultMeta" class="small"></div><div id="questions"></div></section></main>
 <script>
-const API_URL=""; // Set to your production backend URL after backend hosting.
-document.getElementById('file').onchange=e=>{
- const f=e.target.files[0]; if(f) document.getElementById('fileName').textContent=f.name;
-};
-async function generate(){
- const f=document.getElementById('file').files[0];
- if(!f){alert("Please upload a PDF or image first.");return}
- const loading=document.getElementById('loading'); loading.style.display='block';
- try{
-  const fd=new FormData();
-  fd.append('file',f);
-  ['exam','subject','topic','difficulty','language','type','count'].forEach(k=>{
-    const id=k==='type'?'type':k; fd.append(k,document.getElementById(id).value);
-  });
-  const r=await fetch(API_URL+'/ai/generate',{method:'POST',body:fd});
-  const text=await r.text();
-  if(!r.ok) throw new Error(text);
-  const d=JSON.parse(text);
-  document.getElementById('result').textContent=d.content||'No output';
-  document.getElementById('resultCard').style.display='block';
- }catch(e){alert("Backend is not connected yet. The website is ready; we need to connect the AI server next.");}
- finally{loading.style.display='none'}
-}
-</script>
-</body></html>
+const $=id=>document.getElementById(id);let selectedFile=null;
+$("material").onchange=e=>{selectedFile=e.target.files[0]||null;$("fileLabel").textContent=selectedFile?selectedFile.name:"Tap here to select your study material"};
+function status(m,e=false){$("status").style.display="block";$("status").className="status"+(e?" error":"");$("status").textContent=m}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]))}
+function render(qs){$("questions").innerHTML=qs.map((q,i)=>`<article class="q"><div class="qnum">${i+1}. ${esc(q.question)}</div>${(q.options||[]).map((o,j)=>`<div class="opt"><b>${String.fromCharCode(65+j)}.</b> ${esc(o)}</div>`).join("")}<div class="ans">Answer: ${esc(q.answer)}</div><div class="exp">${esc(q.explanation)}</div></article>`).join("");$("results").style.display="block"}
+function dataURL(f){return new Promise((ok,no)=>{let r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(f)})}
+$("generate").onclick=async()=>{let n=+$("count").value;if(selectedFile&&selectedFile.size>3*1024*1024)return status("For this mobile version, please use a PDF/image under 3 MB.",true);
+$("generate").disabled=true;status("Generating high-quality TNPSC questions…");$("results").style.display="none";
+try{let fd=selectedFile?await dataURL(selectedFile):null;let p={exam:$("exam").value,subject:$("subject").value,topic:$("topic").value.trim(),difficulty:$("difficulty").value,language:$("language").value,questionType:$("qtype").value,count:n,fileName:selectedFile?.name||"",fileData:fd};
+let r=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});let d=await r.json();if(!r.ok)throw Error(d.error||"Generation failed");render(d.questions||[]);$("resultMeta").textContent=`${d.questions.length} questions • ${p.exam} • ${p.subject} • ${p.difficulty}`;status("Done ✓")
+}catch(e){status(e.message||"Something went wrong.",true)}finally{$("generate").disabled=false}};
+</script></body></html>
