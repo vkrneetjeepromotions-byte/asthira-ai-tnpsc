@@ -356,5 +356,25 @@ render=function(qs){
  });
 };
 </script>
+  <script>
+(async function(){
+  const s=document.createElement("script");
+  s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+  s.onload=async function(){
+    try{
+      const r=await fetch("/api/config");
+      const c=await r.json();
+      window.supabaseClient=supabase.createClient(
+        c.supabaseUrl,
+        c.supabasePublishableKey
+      );
+      console.log("ASTHIRA Supabase connected ✓");
+    }catch(e){
+      console.error("Supabase connection failed:",e);
+    }
+  };
+  document.head.appendChild(s);
+})();
+</script>
 </body>
 </html>
