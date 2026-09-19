@@ -62,7 +62,7 @@ input[type=file]{display:none}
   header p{font-size:9pt}
   main{max-width:none;margin:0;padding:0}
   .card{box-shadow:none;padding:8px;border-radius:0}
-  .builder,.toolbar,.status,.notice,.pdf-help{display:none!important}
+  .builder,.toolbar,.status,.notice,.pdf-help,.dashboard,.test-panel{display:none!important}
   .results{display:block!important}
   .results>h2{font-size:16pt;margin:3mm 0 2mm}
   .small{font-size:9pt;color:#333;margin-bottom:3mm}
@@ -146,6 +146,8 @@ body.answer-only-print .answerKey{display:block!important}
 <button class="tool" onclick="printFull()">📥 Full PDF</button>
 <button class="tool" onclick="printQuestions()">📝 Question Paper</button>
 <button class="tool" onclick="printAnswers()">🔑 Answer Key</button>
+<button class="tool" onclick="saveCurrentSet()">💾 Save to Question Bank</button>
+<button class="tool" onclick="startTest(lastQuestions)">📝 Take Online Test</button>
 </div>
 
 <div id="questions"></div>
