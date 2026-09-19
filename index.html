@@ -42,6 +42,18 @@ input[type=file]{display:none}
 .notice{background:#f7f8fc;border-left:4px solid #172b70;padding:10px 12px;border-radius:8px;margin-top:12px;font-size:13px}
 .print-meta{display:none}
 @media(max-width:650px){.grid{grid-template-columns:1fr}header h1{font-size:26px}}
+
+.dashboard{margin-top:18px}
+.test-panel{margin-top:18px}
+.test-option{display:block;padding:10px;border:1px solid #d8ddea;border-radius:10px;margin:7px 0;cursor:pointer}
+.test-option input{width:auto;margin-right:8px}
+.result-good{padding:14px;border-radius:12px;background:#eef8f0;margin-top:14px}
+.result-warn{padding:14px;border-radius:12px;background:#fff7e8;margin-top:14px}
+.bank-item{border:1px solid #e0e4ec;border-radius:12px;padding:12px;margin:8px 0}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0}
+.stat{background:#f4f6fb;border-radius:12px;padding:12px;text-align:center}
+.stat b{display:block;font-size:22px;color:#172b70}
+@media(max-width:650px){.stat-grid{grid-template-columns:1fr}}
 @media print{
   body{background:#fff;font-size:11pt}
   header{background:#fff;color:#172b70;padding:8px 0;border-bottom:2px solid #172b70}
@@ -139,6 +151,27 @@ body.answer-only-print .answerKey{display:block!important}
 <div id="questions"></div>
 <div id="answerKey" class="answerKey"></div>
 </section>
+
+<section class="card dashboard">
+<h2>📚 ASTHIRA Student & Question Bank</h2>
+<div class="toolbar">
+<button class="tool" onclick="showBank()">📚 Question Bank</button>
+<button class="tool" onclick="showTests()">📊 Test Results</button>
+<button class="tool" onclick="showLeaderboard()">🏆 Leaderboard</button>
+<button class="tool" onclick="exportData()">⬇️ Export Data</button>
+<button class="tool" onclick="document.getElementById('importData').click()">⬆️ Import Data</button>
+<input id="importData" type="file" accept=".json" style="display:none" onchange="importDataFile(event)">
+</div>
+<div id="dashboardContent" class="small">Save a generated set or complete a test to see your data here.</div>
+</section>
+
+<section id="testPanel" class="card test-panel" style="display:none">
+<h2>⏱️ Online Test</h2>
+<div id="testInfo" class="small"></div>
+<div id="testQuestions"></div>
+<button class="primary" id="submitTestBtn" onclick="submitTest()">Submit Test</button>
+<div id="testResult"></div>
+</section>
 </main>
 
 <script>
@@ -230,6 +263,96 @@ function savePDF(){doPrint("full")}
 function printFull(){doPrint("full")}
 function printQuestions(){doPrint("questions")}
 function printAnswers(){doPrint("answers")}
+
+/* ASTHIRA All Features MVP */
+let currentMeta = {};
+let testSet = [];
+let testAnswers = {};
+
+function getBank(){try{return JSON.parse(localStorage.getItem("asthira_bank")||"[]")}catch(e){return[]}}
+function getTests(){try{return JSON.parse(localStorage.getItem("asthira_tests")||"[]")}catch(e){return[]}}
+function putBank(x){localStorage.setItem("asthira_bank",JSON.stringify(x))}
+function putTests(x){localStorage.setItem("asthira_tests",JSON.stringify(x))}
+
+function saveCurrentSet(){
+ if(!lastQuestions.length){alert("Generate questions first.");return}
+ const b=getBank(); b.unshift({id:Date.now(),meta:currentMeta,questions:lastQuestions});
+ putBank(b.slice(0,50)); showBank(); alert("Question set saved on this device.");
+}
+function showBank(){
+ const b=getBank(),el=$("dashboardContent");
+ if(!b.length){el.innerHTML="No saved question sets yet.";return}
+ el.innerHTML=b.map((s,i)=>`<div class="bank-item"><b>${esc(s.meta.exam||"TNPSC")} • ${esc(s.meta.subject||"")}</b><br><span class="small">${esc(s.meta.topic||"General")} • ${s.questions.length} questions • ${esc(s.meta.difficulty||"")}</span><div class="toolbar"><button class="tool" onclick="loadSavedSet(${i})">Open</button><button class="tool" onclick="testSavedSet(${i})">Test</button><button class="tool" onclick="deleteSavedSet(${i})">Delete</button></div></div>`).join("");
+}
+function loadSavedSet(i){
+ const s=getBank()[i];if(!s)return;currentMeta=s.meta;render(s.questions);
+ $("resultMeta").textContent=`${s.questions.length} questions • ${s.meta.exam} • ${s.meta.subject} • ${s.meta.difficulty||""}`;
+ window.scrollTo({top:$("results").offsetTop-10,behavior:"smooth"});
+}
+function deleteSavedSet(i){const b=getBank();b.splice(i,1);putBank(b);showBank()}
+function showTests(){
+ const t=getTests(),el=$("dashboardContent");
+ if(!t.length){el.innerHTML="No completed tests yet.";return}
+ const total=t.reduce((a,x)=>a+x.total,0),correct=t.reduce((a,x)=>a+x.correct,0);
+ el.innerHTML=`<div class="stat-grid"><div class="stat"><b>${t.length}</b>Tests</div><div class="stat"><b>${correct}</b>Correct</div><div class="stat"><b>${total?Math.round(correct/total*100):0}%</b>Accuracy</div></div>`+
+ t.slice(0,20).map(x=>`<div class="bank-item"><b>${esc(x.title)}</b><br>${x.correct}/${x.total} • ${x.percent}% • ${new Date(x.date).toLocaleString()}</div>`).join("");
+}
+function showLeaderboard(){
+ const t=getTests(),el=$("dashboardContent");
+ if(!t.length){el.innerHTML="Complete a test to appear on this device leaderboard.";return}
+ const s=[...t].sort((a,b)=>b.percent-a.percent).slice(0,20);
+ el.innerHTML="<b>Device leaderboard</b><div class='small'>Stored only on this browser/device.</div>"+
+ s.map((x,i)=>`<div class="bank-item"><b>#${i+1} ${esc(x.name||"Student")}</b> — ${x.percent}% (${x.correct}/${x.total})</div>`).join("");
+}
+function exportData(){
+ const d={bank:getBank(),tests:getTests(),exportedAt:new Date().toISOString()};
+ const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,2)],{type:"application/json"}));a.download="asthira-ai-data.json";a.click();
+ setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function importDataFile(e){
+ const f=e.target.files[0];if(!f)return;const r=new FileReader();
+ r.onload=()=>{try{const d=JSON.parse(r.result);if(Array.isArray(d.bank))putBank(d.bank);if(Array.isArray(d.tests))putTests(d.tests);showBank();alert("Data imported.");}catch(x){alert("Invalid ASTHIRA data file.")}};
+ r.readAsText(f);
+}
+function testSavedSet(i){const s=getBank()[i];if(s){currentMeta=s.meta;startTest(s.questions)}}
+function startTest(qs){
+ const questions=qs||lastQuestions;
+ if(!questions.length){alert("Generate or save a question set first.");return}
+ testSet=questions.map(q=>({...q}));testAnswers={};
+ $("testPanel").style.display="block";$("testResult").innerHTML="";$("submitTestBtn").disabled=false;
+ $("testInfo").textContent=`${testSet.length} questions • ${currentMeta.exam||"TNPSC"} • ${currentMeta.subject||""}`;
+ $("testQuestions").innerHTML=testSet.map((q,i)=>`<article class="q"><div class="qnum">${i+1}. ${esc(q.question)}</div>${(q.options||[]).map((o,j)=>`<label class="test-option"><input type="radio" name="t${i}" value="${String.fromCharCode(65+j)}" onchange="testAnswers[${i}]=this.value"> <b>${String.fromCharCode(65+j)}.</b> ${esc(o)}</label>`).join("")}</article>`).join("");
+ window.scrollTo({top:$("testPanel").offsetTop-10,behavior:"smooth"});
+}
+function submitTest(){
+ if(!testSet.length)return;let correct=0;testSet.forEach((q,i)=>{if(testAnswers[i]===q.answerLetter)correct++});
+ const total=testSet.length,percent=Math.round(correct/total*100);
+ const name=localStorage.getItem("asthira_student_name")||prompt("Enter student name")||"Student";localStorage.setItem("asthira_student_name",name);
+ const t=getTests();t.unshift({date:new Date().toISOString(),name,title:`${currentMeta.exam||"TNPSC"} • ${currentMeta.subject||""}`,correct,total,percent});putTests(t.slice(0,100));
+ $("submitTestBtn").disabled=true;$("testResult").innerHTML=`<div class="${percent>=60?'result-good':'result-warn'}"><b>Score: ${correct}/${total} (${percent}%)</b><br>${percent>=60?"Good performance. Review incorrect questions and retry.":"Keep practising. Review the explanations and try again."}</div>`;
+}
+function regenerateQuestion(i){
+ const p={exam:currentMeta.exam||"TNPSC Group 2",subject:currentMeta.subject||"Indian Polity",topic:currentMeta.topic||"",difficulty:currentMeta.difficulty||"Very Tough",language:currentMeta.language||"Tamil",questionType:currentMeta.questionType||"MCQ",count:1};
+ fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}).then(r=>r.json().then(d=>({ok:r.ok,d}))).then(x=>{
+  if(!x.ok)throw Error(x.d.error||"Regeneration failed");lastQuestions[i]=x.d.questions[0];render(lastQuestions);
+ }).catch(e=>alert(e.message));
+}
+
+/* Capture the current generator selections after generation. */
+const oldGenerate=$("generate").onclick;
+$("generate").onclick=async function(){
+ await oldGenerate.call(this);
+ currentMeta={exam:$("exam").value,subject:$("subject").value,topic:$("topic").value.trim(),difficulty:$("difficulty").value,language:$("language").value,questionType:$("qtype").value,count:+$("count").value};
+};
+
+/* Add per-question regenerate buttons while preserving the existing PDF layout. */
+const oldRender=render;
+render=function(qs){
+ oldRender(qs);
+ document.querySelectorAll("#questions .q").forEach((el,i)=>{
+  const b=document.createElement("button");b.className="tool";b.textContent="🔄 Regenerate";b.style.marginTop="8px";b.onclick=()=>regenerateQuestion(i);el.appendChild(b);
+ });
+};
 </script>
 </body>
 </html>
