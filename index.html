@@ -213,7 +213,7 @@ $("generate").onclick=async()=>{
     $("resultMeta").textContent=`${d.questions.length} questions • ${p.exam} • ${p.subject} • ${p.difficulty} • ${p.questionType}`;
     document.title=`ASTHIRA AI - ${p.exam} - ${p.subject} - ${d.questions.length} Questions`;
     status("Done ✓");
-    $("pdf-help").style.display="block";
+    const pdfHelp = $("pdf-help"); if (pdfHelp) pdfHelp.style.display="block";
   }catch(e){
     status(e.message||"Something went wrong.",true);
   }finally{$("generate").disabled=false;}
