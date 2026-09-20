@@ -376,5 +376,97 @@ render=function(qs){
   document.head.appendChild(s);
 })();
 </script>
+  <script>
+(function(){
+  async function startAuth(){
+    if(!window.supabaseClient){setTimeout(startAuth,300);return;}
+    const supabase=window.supabaseClient, main=document.querySelector("main");
+    if(!main||document.getElementById("asthiraAuth"))return;
+
+    const box=document.createElement("section");
+    box.id="asthiraAuth"; box.className="card"; box.style.marginBottom="18px";
+    box.innerHTML=`
+      <h2 style="margin-bottom:12px">Student Login</h2>
+      <div id="authMessage" class="status" style="display:none"></div>
+      <div id="authForm">
+        <label>Full Name</label>
+        <input id="authName" type="text" placeholder="Enter your full name">
+        <label>Student ID</label>
+        <input id="authStudentId" type="text" placeholder="Example: ASTHIRA001">
+        <label>Email</label>
+        <input id="authEmail" type="email" placeholder="Enter email">
+        <label>Password</label>
+        <input id="authPassword" type="password" placeholder="Minimum 6 characters">
+        <div class="toolbar">
+          <button class="primary" id="signupBtn" type="button">Create Student Account</button>
+          <button class="tool" id="loginBtn" type="button">Login</button>
+        </div>
+        <div class="small">New student: enter all four details and tap Create Student Account. Existing student: enter email and password and tap Login.</div>
+      </div>
+      <div id="authUser" style="display:none">
+        <div id="welcomeText" style="font-weight:700;margin-bottom:10px"></div>
+        <div class="small" id="profileText"></div>
+        <button class="tool" id="logoutBtn" type="button" style="margin-top:12px">Logout</button>
+      </div>`;
+
+    main.insertBefore(box,main.firstChild);
+    const msg=document.getElementById("authMessage"),form=document.getElementById("authForm"),userBox=document.getElementById("authUser");
+
+    function message(text,error=false){
+      msg.textContent=text; msg.style.display="block"; msg.className=error?"status error":"status";
+    }
+
+    async function loadProfile(user){
+      const {data,error}=await supabase.from("profiles").select("id,full_name,student_id,role").eq("id",user.id).maybeSingle();
+      if(error){message("Profile load failed: "+error.message,true);return;}
+      if(!data){message("Account created. Please complete your profile after login.");return;}
+      form.style.display="none"; userBox.style.display="block";
+      document.getElementById("welcomeText").textContent="Welcome, "+(data.full_name||user.email)+" 👋";
+      document.getElementById("profileText").textContent="Student ID: "+(data.student_id||"Not set")+" • Role: "+(data.role||"student");
+    }
+
+    async function saveProfile(user){
+      const fullName=document.getElementById("authName").value.trim();
+      const studentId=document.getElementById("authStudentId").value.trim();
+      if(!fullName||!studentId){message("Please enter Full Name and Student ID.",true);return false;}
+      const {error}=await supabase.from("profiles").upsert({id:user.id,full_name:fullName,student_id:studentId,role:"student"});
+      if(error){message("Profile save failed: "+error.message,true);return false;}
+      return true;
+    }
+
+    document.getElementById("signupBtn").onclick=async function(){
+      const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;
+      if(!email||password.length<6){message("Enter a valid email and a password of at least 6 characters.",true);return;}
+      this.disabled=true;
+      const {data,error}=await supabase.auth.signUp({email,password});
+      this.disabled=false;
+      if(error){message(error.message,true);return;}
+      if(data.user){await saveProfile(data.user);message("Account created. Check your email and confirm your account, then login.");}
+    };
+
+    document.getElementById("loginBtn").onclick=async function(){
+      const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;
+      if(!email||!password){message("Enter email and password.",true);return;}
+      this.disabled=true;
+      const {data,error}=await supabase.auth.signInWithPassword({email,password});
+      this.disabled=false;
+      if(error){message(error.message,true);return;}
+      if(data.user)await loadProfile(data.user);
+    };
+
+    document.getElementById("logoutBtn").onclick=async function(){
+      await supabase.auth.signOut(); form.style.display="block"; userBox.style.display="none"; message("Logged out.");
+    };
+
+    supabase.auth.onAuthStateChange(async function(event,session){
+      if(session&&session.user)await loadProfile(session.user);
+    });
+
+    const {data:{session}}=await supabase.auth.getSession();
+    if(session&&session.user)await loadProfile(session.user);
+  }
+  startAuth();
+})();
+</script>
 </body>
 </html>
