@@ -381,10 +381,7 @@ render=function(qs){
 
   async function startStudentLogin(){
 
-    if(!window.supabaseClient){
-      setTimeout(startStudentLogin,500);
-      return;
-    }
+    
 
     const supabase=window.supabaseClient;
     const main=document.querySelector("main");
