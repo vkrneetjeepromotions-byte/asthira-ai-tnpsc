@@ -364,7 +364,7 @@ render=function(qs){
     try{
       const r=await fetch("/api/config");
       const c=await r.json();
-      window.supabaseClient=supabase.createClient(
+      window.supabaseClient=window.supabase.createClient(
         c.supabaseUrl,
         c.supabasePublishableKey
       );
