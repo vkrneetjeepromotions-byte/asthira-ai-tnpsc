@@ -379,16 +379,38 @@ render=function(qs){
   <script>
 (function(){
 
-  async function startStudentLogin(){
+  function waitForSupabase(){
+    return new Promise(function(resolve,reject){
+      let attempts=0;
 
-    
+      function check(){
+        if(window.supabaseClient){
+          resolve(window.supabaseClient);
+          return;
+        }
 
-    const supabase=window.supabaseClient;
+        attempts++;
+
+        if(attempts>=40){
+          reject(new Error("Supabase connection timeout"));
+          return;
+        }
+
+        setTimeout(check,250);
+      }
+
+      check();
+    });
+  }
+
+  function startStudentLogin(){
+
     const main=document.querySelector("main");
 
     if(!main || document.getElementById("asthiraAuth")) return;
 
     const box=document.createElement("section");
+
     box.id="asthiraAuth";
     box.className="card";
     box.style.marginBottom="18px";
@@ -396,25 +418,46 @@ render=function(qs){
     box.innerHTML=`
       <h2 style="margin-bottom:12px">🎓 Student Login</h2>
 
-      <div id="authMessage" class="status" style="display:none;margin-bottom:12px"></div>
+      <div id="authMessage"
+           class="status"
+           style="display:none;margin-bottom:12px"></div>
 
       <div id="authForm">
 
         <label>Full Name</label>
-        <input id="authName" type="text" placeholder="Enter your full name">
+        <input id="authName"
+               type="text"
+               placeholder="Enter your full name">
 
         <label>Student ID</label>
-        <input id="authStudentId" type="text" placeholder="Example: ASTHIRA001">
+        <input id="authStudentId"
+               type="text"
+               placeholder="Example: ASTHIRA001">
 
         <label>Email</label>
-        <input id="authEmail" type="email" placeholder="Enter email address">
+        <input id="authEmail"
+               type="email"
+               placeholder="Enter email address">
 
         <label>Password</label>
-        <input id="authPassword" type="password" placeholder="Minimum 6 characters">
+        <input id="authPassword"
+               type="password"
+               placeholder="Minimum 6 characters">
 
         <div class="toolbar">
-          <button class="primary" id="signupBtn" type="button">Create Student Account</button>
-          <button class="tool" id="loginBtn" type="button">Login</button>
+
+          <button class="primary"
+                  id="signupBtn"
+                  type="button">
+            Create Student Account
+          </button>
+
+          <button class="tool"
+                  id="loginBtn"
+                  type="button">
+            Login
+          </button>
+
         </div>
 
         <div class="small">
@@ -426,11 +469,15 @@ render=function(qs){
 
       <div id="authUser" style="display:none">
 
-        <div id="welcomeText" style="font-weight:700;margin-bottom:10px"></div>
+        <div id="welcomeText"
+             style="font-weight:700;margin-bottom:10px"></div>
 
         <div class="small" id="profileText"></div>
 
-        <button class="tool" id="logoutBtn" type="button" style="margin-top:12px">
+        <button class="tool"
+                id="logoutBtn"
+                type="button"
+                style="margin-top:12px">
           Logout
         </button>
 
@@ -446,10 +493,26 @@ render=function(qs){
     function message(text,error=false){
       msg.textContent=text;
       msg.style.display="block";
-      msg.className=error?"status error":"status";
+      msg.className=error ? "status error" : "status";
+    }
+
+    async function getSupabase(){
+      try{
+        return await waitForSupabase();
+      }catch(e){
+        message(
+          "Unable to connect to student login. Please try again.",
+          true
+        );
+        return null;
+      }
     }
 
     async function showProfile(user){
+
+      const supabase=await getSupabase();
+
+      if(!supabase) return;
 
       const {data,error}=await supabase
         .from("profiles")
@@ -471,16 +534,20 @@ render=function(qs){
       userBox.style.display="block";
 
       document.getElementById("welcomeText").textContent=
-        "Welcome, "+(data.full_name||user.email)+" 👋";
+        "Welcome, "+(data.full_name || user.email)+" 👋";
 
       document.getElementById("profileText").textContent=
         "Student ID: "+
-        (data.student_id||"Not set")+
+        (data.student_id || "Not set")+
         " • Role: "+
-        (data.role||"student");
+        (data.role || "student");
     }
 
     async function updateProfile(user){
+
+      const supabase=await getSupabase();
+
+      if(!supabase) return false;
 
       const fullName=
         document.getElementById("authName").value.trim();
@@ -508,22 +575,44 @@ render=function(qs){
 
     document.getElementById("signupBtn").onclick=async function(){
 
-      const fullName=document.getElementById("authName").value.trim();
-      const studentId=document.getElementById("authStudentId").value.trim();
-      const email=document.getElementById("authEmail").value.trim();
-      const password=document.getElementById("authPassword").value;
+      const fullName=
+        document.getElementById("authName").value.trim();
+
+      const studentId=
+        document.getElementById("authStudentId").value.trim();
+
+      const email=
+        document.getElementById("authEmail").value.trim();
+
+      const password=
+        document.getElementById("authPassword").value;
 
       if(!fullName || !studentId || !email){
-        message("Please enter Full Name, Student ID and Email.",true);
+        message(
+          "Please enter Full Name, Student ID and Email.",
+          true
+        );
         return;
       }
 
       if(password.length<6){
-        message("Password must contain at least 6 characters.",true);
+        message(
+          "Password must contain at least 6 characters.",
+          true
+        );
         return;
       }
 
       this.disabled=true;
+      this.textContent="Creating...";
+
+      const supabase=await getSupabase();
+
+      if(!supabase){
+        this.disabled=false;
+        this.textContent="Create Student Account";
+        return;
+      }
 
       const {data,error}=await supabase.auth.signUp({
         email:email,
@@ -537,6 +626,7 @@ render=function(qs){
       });
 
       this.disabled=false;
+      this.textContent="Create Student Account";
 
       if(error){
         message(error.message,true);
@@ -549,36 +639,56 @@ render=function(qs){
 
           await updateProfile(data.user);
           await showProfile(data.user);
-          message("Student account created successfully.");
+
+          message(
+            "Student account created successfully."
+          );
 
         }else{
 
-          message("Account created successfully. Check your email, confirm your account, then login.");
+          message(
+            "Account created successfully. Check your email, confirm your account, then login."
+          );
 
         }
-
       }
-
     };
 
     document.getElementById("loginBtn").onclick=async function(){
 
-      const email=document.getElementById("authEmail").value.trim();
-      const password=document.getElementById("authPassword").value;
+      const email=
+        document.getElementById("authEmail").value.trim();
+
+      const password=
+        document.getElementById("authPassword").value;
 
       if(!email || !password){
-        message("Enter your email and password.",true);
+        message(
+          "Enter your email and password.",
+          true
+        );
         return;
       }
 
       this.disabled=true;
+      this.textContent="Logging in...";
 
-      const {data,error}=await supabase.auth.signInWithPassword({
-        email:email,
-        password:password
-      });
+      const supabase=await getSupabase();
+
+      if(!supabase){
+        this.disabled=false;
+        this.textContent="Login";
+        return;
+      }
+
+      const {data,error}=
+        await supabase.auth.signInWithPassword({
+          email:email,
+          password:password
+        });
 
       this.disabled=false;
+      this.textContent="Login";
 
       if(error){
         message(error.message,true);
@@ -586,15 +696,16 @@ render=function(qs){
       }
 
       if(data.user){
-
         await updateProfile(data.user);
         await showProfile(data.user);
-
       }
-
     };
 
     document.getElementById("logoutBtn").onclick=async function(){
+
+      const supabase=await getSupabase();
+
+      if(!supabase) return;
 
       await supabase.auth.signOut();
 
@@ -602,28 +713,36 @@ render=function(qs){
       userBox.style.display="none";
 
       message("Logged out successfully.");
-
     };
 
-    supabase.auth.onAuthStateChange(async function(event,session){
+    waitForSupabase().then(async function(supabase){
+
+      supabase.auth.onAuthStateChange(
+        async function(event,session){
+          if(session && session.user){
+            await showProfile(session.user);
+          }
+        }
+      );
+
+      const result=await supabase.auth.getSession();
+      const session=result.data.session;
 
       if(session && session.user){
         await showProfile(session.user);
       }
 
+    }).catch(function(){
+      message(
+        "Student login is ready. Please try again in a moment.",
+        true
+      );
     });
-
-    const result=await supabase.auth.getSession();
-    const session=result.data.session;
-
-    if(session && session.user){
-      await showProfile(session.user);
-    }
-
   }
 
   startStudentLogin();
+
 })();
- </script>
+</script>
 </body>
 </html>
