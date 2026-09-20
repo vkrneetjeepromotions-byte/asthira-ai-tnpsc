@@ -745,5 +745,289 @@ render=function(qs){
 
 })();
 </script>
+  PASTE THIS ENTIRE BLOCK IMMEDIATELY BEFORE </body> IN index.html
+
+<script>
+(async function(){
+  function waitForSupabase(){
+    return new Promise(function(resolve,reject){
+      let n=0;
+      function check(){
+        if(window.supabaseClient) return resolve(window.supabaseClient);
+        if(++n>60) return reject(new Error("Supabase connection timeout"));
+        setTimeout(check,250);
+      }
+      check();
+    });
+  }
+
+  async function sessionUser(){
+    const sb=await waitForSupabase();
+    const r=await sb.auth.getSession();
+    return {sb,user:r.data&&r.data.session?r.data.session.user:null};
+  }
+
+  function localBank(){
+    try{return JSON.parse(localStorage.getItem("asthira_bank")||"[]")}catch(e){return[]}
+  }
+  function localTests(){
+    try{return JSON.parse(localStorage.getItem("asthira_tests")||"[]")}catch(e){return[]}
+  }
+  function putBank(x){localStorage.setItem("asthira_bank",JSON.stringify(x))}
+  function putTests(x){localStorage.setItem("asthira_tests",JSON.stringify(x))}
+
+  async function syncBank(sb,user){
+    const local=localBank();
+    for(const s of local){
+      const row={
+        user_id:user.id,
+        client_id:String(s.id),
+        title:(s.meta&&s.meta.exam?String(s.meta.exam):"TNPSC")+" • "+(s.meta&&s.meta.subject?String(s.meta.subject):""),
+        exam:s.meta&&s.meta.exam||"TNPSC",
+        subject:s.meta&&s.meta.subject||"",
+        topic:s.meta&&s.meta.topic||"",
+        difficulty:s.meta&&s.meta.difficulty||"",
+        language:s.meta&&s.meta.language||"",
+        question_type:s.meta&&s.meta.questionType||"",
+        question_count:Array.isArray(s.questions)?s.questions.length:0,
+        meta:s.meta||{},
+        questions:Array.isArray(s.questions)?s.questions:[]
+      };
+      const {error}=await sb.from("cloud_question_sets").upsert(row,{onConflict:"user_id,client_id"});
+      if(error) console.error("Question bank sync:",error.message);
+    }
+
+    const {data,error}=await sb.from("cloud_question_sets")
+      .select("*").eq("user_id",user.id).order("created_at",{ascending:false});
+    if(error){console.error("Cloud bank read:",error.message);return}
+    if(!Array.isArray(data))return;
+
+    const merged=[...local];
+    data.forEach(row=>{
+      const id=Number(row.client_id)||Date.parse(row.created_at)||Date.now();
+      const item={id,meta:row.meta||{
+        exam:row.exam,subject:row.subject,topic:row.topic,difficulty:row.difficulty,
+        language:row.language,questionType:row.question_type,count:row.question_count
+      },questions:Array.isArray(row.questions)?row.questions:[]};
+      const idx=merged.findIndex(x=>String(x.id)===String(row.client_id));
+      if(idx>=0) merged[idx]=item; else merged.push(item);
+    });
+    merged.sort((a,b)=>(Number(b.id)||0)-(Number(a.id)||0));
+    putBank(merged.slice(0,100));
+  }
+
+  async function syncTests(sb,user){
+    const local=localTests();
+    for(const t of local){
+      const clientId=String(t.client_id||t.id||((t.date||"")+"|"+(t.title||"")+"|"+(t.correct||0)+"|"+(t.total||0)));
+      const row={
+        user_id:user.id,
+        client_id:clientId,
+        title:t.title||"TNPSC Test",
+        exam:(t.meta&&t.meta.exam)||"",
+        subject:(t.meta&&t.meta.subject)||"",
+        topic:(t.meta&&t.meta.topic)||"",
+        correct:Number(t.correct)||0,
+        total:Number(t.total)||0,
+        percent:Number(t.percent)||0,
+        answers:t.answers||{},
+        completed_at:t.date||new Date().toISOString()
+      };
+      const {error}=await sb.from("cloud_test_results").upsert(row,{onConflict:"user_id,client_id"});
+      if(error) console.error("Test history sync:",error.message);
+    }
+
+    const {data,error}=await sb.from("cloud_test_results")
+      .select("*").eq("user_id",user.id).order("completed_at",{ascending:false});
+    if(error){console.error("Cloud tests read:",error.message);return}
+    if(!Array.isArray(data))return;
+
+    const merged=[...local];
+    data.forEach(row=>{
+      const item={
+        client_id:row.client_id,
+        date:row.completed_at,
+        name:(row.title||"Student"),
+        title:row.title,
+        correct:row.correct,
+        total:row.total,
+        percent:row.percent,
+        meta:{exam:row.exam,subject:row.subject,topic:row.topic},
+        answers:row.answers||{}
+      };
+      const idx=merged.findIndex(x=>String(x.client_id||x.id)===String(row.client_id));
+      if(idx>=0) merged[idx]=Object.assign({},merged[idx],item); else merged.push(item);
+    });
+    merged.sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));
+    putTests(merged.slice(0,200));
+  }
+
+  async function syncAll(){
+    try{
+      const x=await sessionUser();
+      if(!x.user)return;
+      await syncBank(x.sb,x.user);
+      await syncTests(x.sb,x.user);
+      addCloudButtons();
+    }catch(e){console.error("ASTHIRA cloud sync:",e)}
+  }
+
+  function addCloudButtons(){
+    const bar=document.querySelector(".dashboard .toolbar");
+    if(!bar||document.getElementById("cloudDashboardBtn"))return;
+
+    const b1=document.createElement("button");
+    b1.id="cloudDashboardBtn";b1.className="tool";b1.textContent="☁️ My Dashboard";
+    b1.onclick=showCloudDashboard;bar.insertBefore(b1,bar.firstChild);
+
+    const b2=document.createElement("button");
+    b2.className="tool";b2.textContent="☁️ Cloud Question Bank";
+    b2.onclick=showCloudBank;bar.insertBefore(b2,b1.nextSibling);
+
+    const b3=document.createElement("button");
+    b3.className="tool";b3.textContent="🏆 Institute Ranking";
+    b3.onclick=showCloudLeaderboard;bar.appendChild(b3);
+
+    const b4=document.createElement("button");
+    b4.className="tool";b4.textContent="📈 Performance";
+    b4.onclick=showCloudPerformance;bar.appendChild(b4);
+  }
+
+  async function showCloudDashboard(){
+    const x=await sessionUser();
+    if(!x.user){alert("Please login first.");return}
+    const t=localTests(),b=localBank();
+    const total=t.reduce((a,z)=>a+(Number(z.total)||0),0);
+    const correct=t.reduce((a,z)=>a+(Number(z.correct)||0),0);
+    const avg=t.length?Math.round(t.reduce((a,z)=>a+(Number(z.percent)||0),0)/t.length):0;
+    document.getElementById("dashboardContent").innerHTML=
+      "<div class='stat-grid'>"+
+      "<div class='stat'><b>"+b.length+"</b>Question Sets</div>"+
+      "<div class='stat'><b>"+t.length+"</b>Tests</div>"+
+      "<div class='stat'><b>"+avg+"%</b>Average</div>"+
+      "</div>"+
+      "<div class='bank-item'><b>📊 Overall Performance</b><br>"+
+      correct+" correct out of "+total+" questions • "+(total?Math.round(correct/total*100):0)+"% accuracy</div>"+
+      "<div class='bank-item'><b>☁️ Cloud Sync Active</b><br><span class='small'>Your question bank and test history are linked to your student account.</span></div>";
+  }
+
+  async function showCloudBank(){
+    const x=await sessionUser();
+    if(!x.user){alert("Please login first.");return}
+    const {data,error}=await x.sb.from("cloud_question_sets")
+      .select("*").eq("user_id",x.user.id).order("created_at",{ascending:false});
+    const el=document.getElementById("dashboardContent");
+    if(error){el.textContent="Cloud Question Bank error: "+error.message;return}
+    if(!data||!data.length){el.textContent="No cloud question sets yet.";return}
+    el.innerHTML=data.map(s=>
+      "<div class='bank-item'><b>"+esc(s.title||"TNPSC Question Set")+"</b><br>"+
+      "<span class='small'>"+esc(s.topic||"General")+" • "+(s.question_count||0)+" questions • "+esc(s.difficulty||"")+"</span></div>"
+    ).join("");
+  }
+
+  async function showCloudLeaderboard(){
+    const x=await sessionUser();
+    if(!x.user){alert("Please login first.");return}
+    const {data,error}=await x.sb.from("cloud_leaderboard")
+      .select("full_name,student_id,tests_count,average_percent,best_percent,last_test_at")
+      .order("average_percent",{ascending:false}).order("best_percent",{ascending:false}).limit(50);
+    const el=document.getElementById("dashboardContent");
+    if(error){el.textContent="Leaderboard error: "+error.message;return}
+    if(!data||!data.length){el.textContent="No institute test results yet.";return}
+    el.innerHTML="<b>🏆 Institute Leaderboard</b><div class='small'>Based on completed online tests.</div>"+
+      data.map((s,i)=>
+        "<div class='bank-item'><b>#"+(i+1)+" "+esc(s.full_name||"Student")+"</b>"+
+        "<br><span class='small'>"+esc(s.student_id||"")+" • "+s.average_percent+"% average • Best "+s.best_percent+"% • "+s.tests_count+" tests</span></div>"
+      ).join("");
+  }
+
+  async function showCloudPerformance(){
+    const x=await sessionUser();
+    if(!x.user){alert("Please login first.");return}
+    const {data,error}=await x.sb.from("cloud_test_results")
+      .select("title,exam,subject,topic,correct,total,percent,completed_at")
+      .eq("user_id",x.user.id).order("completed_at",{ascending:false});
+    const el=document.getElementById("dashboardContent");
+    if(error){el.textContent="Performance error: "+error.message;return}
+    if(!data||!data.length){el.textContent="Complete an online test to see performance.";return}
+    const by={};
+    data.forEach(t=>{
+      const k=t.subject||"General";
+      if(!by[k])by[k]={tests:0,total:0,correct:0};
+      by[k].tests++;by[k].total+=Number(t.total)||0;by[k].correct+=Number(t.correct)||0;
+    });
+    el.innerHTML="<b>📈 Subject-wise Performance</b>"+
+      Object.keys(by).map(k=>{
+        const a=by[k],p=a.total?Math.round(a.correct/a.total*100):0;
+        return "<div class='bank-item'><b>"+esc(k)+"</b><br>"+a.tests+" tests • "+a.correct+"/"+a.total+" correct • "+p+"% accuracy</div>";
+      }).join("");
+  }
+
+  async function showAdminDashboard(){
+    const x=await sessionUser();
+    if(!x.user){alert("Please login first.");return}
+    const {data:profile}=await x.sb.from("profiles").select("role").eq("id",x.user.id).maybeSingle();
+    if(!profile||profile.role!=="admin"){alert("Admin access only.");return}
+    const {data,error}=await x.sb.from("cloud_admin_student_summary")
+      .select("*").order("average_percent",{ascending:false});
+    const el=document.getElementById("dashboardContent");
+    if(error){el.textContent="Admin dashboard error: "+error.message;return}
+    el.innerHTML="<b>👨‍🏫 Admin Student Dashboard</b>"+
+      (data||[]).map(s=>"<div class='bank-item'><b>"+esc(s.full_name||"Student")+"</b><br>"+
+      "<span class='small'>"+esc(s.student_id||"")+" • "+s.tests_count+" tests • "+s.average_percent+"% average • Best "+s.best_percent+"%</span></div>").join("");
+  }
+
+  const oldSave=window.saveCurrentSet;
+  if(typeof oldSave==="function"){
+    window.saveCurrentSet=function(){
+      oldSave();
+      setTimeout(async function(){
+        try{
+          const x=await sessionUser();if(!x.user)return;
+          await syncBank(x.sb,x.user);
+          addCloudButtons();
+        }catch(e){console.error(e)}
+      },100);
+    };
+  }
+
+  const oldSubmit=window.submitTest;
+  if(typeof oldSubmit==="function"){
+    window.submitTest=function(){
+      oldSubmit();
+      setTimeout(async function(){
+        try{
+          const x=await sessionUser();if(!x.user)return;
+          await syncTests(x.sb,x.user);
+          addCloudButtons();
+        }catch(e){console.error(e)}
+      },150);
+    };
+  }
+
+  try{
+    const x=await sessionUser();
+    if(x.user){
+      await syncAll();
+      const {data:p}=await x.sb.from("profiles").select("role").eq("id",x.user.id).maybeSingle();
+      if(p&&p.role==="admin"){
+        const bar=document.querySelector(".dashboard .toolbar");
+        if(bar&&!document.getElementById("adminDashboardBtn")){
+          const b=document.createElement("button");
+          b.id="adminDashboardBtn";b.className="tool";b.textContent="👨‍🏫 Admin Dashboard";
+          b.onclick=showAdminDashboard;bar.appendChild(b);
+        }
+      }
+    }
+  }catch(e){console.error(e)}
+
+  try{
+    const sb=await waitForSupabase();
+    sb.auth.onAuthStateChange(function(event,session){
+      if(session&&session.user)setTimeout(syncAll,300);
+    });
+  }catch(e){}
+})();
+</script>
 </body>
 </html>
