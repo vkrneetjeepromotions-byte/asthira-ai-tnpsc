@@ -1197,5 +1197,440 @@ render=function(qs){
   }catch(e){console.error("ASTHIRA staff dashboard:",e)}
 })();
 </script>
+  <script>
+/* =========================================================
+   ASTHIRA AI 2.0 — STUDENT + ADMIN UPGRADE
+   Paste this ENTIRE block immediately before </body>
+   Do not delete existing ASTHIRA code.
+   ========================================================= */
+(async function(){
+
+  function waitForSupabase(){
+    return new Promise(function(resolve,reject){
+      let n=0;
+      function check(){
+        if(window.supabaseClient) return resolve(window.supabaseClient);
+        if(++n>80) return reject(new Error("Supabase connection timeout"));
+        setTimeout(check,250);
+      }
+      check();
+    });
+  }
+
+  async function getSession(){
+    const sb=await waitForSupabase();
+    const r=await sb.auth.getSession();
+    return {
+      sb:sb,
+      user:r.data && r.data.session ? r.data.session.user : null
+    };
+  }
+
+  function esc(v){
+    return String(v==null?"":v)
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;")
+      .replace(/'/g,"&#039;");
+  }
+
+  function contentEl(){
+    return document.getElementById("dashboardContent");
+  }
+
+  function ensureButtons(){
+    const bar=document.querySelector(".dashboard .toolbar");
+    if(!bar) return;
+
+    function add(id,text,fn){
+      if(document.getElementById(id)) return;
+      const b=document.createElement("button");
+      b.id=id;
+      b.className="tool";
+      b.textContent=text;
+      b.onclick=fn;
+      bar.appendChild(b);
+    }
+
+    add("ast20ProfileBtn","👤 Student Profile",showProfile);
+    add("ast20ProgressBtn","📊 Progress",showProgress);
+    add("ast20BadgesBtn","🏅 Badges",showBadges);
+    add("ast20AssignBtn","📝 My Assignments",showAssignments);
+    add("ast20NoticeBtn","📢 Announcements",showAnnouncements);
+    add("ast20NotifyBtn","🔔 Notifications",showNotifications);
+    add("ast20ReportBtn","📄 Performance Report",showReport);
+  }
+
+  async function showProfile(){
+    const x=await getSession();
+    if(!x.user){alert("Please login first.");return;}
+
+    const {data:p}=await x.sb.from("profiles")
+      .select("full_name,student_id,role")
+      .eq("id",x.user.id)
+      .maybeSingle();
+
+    const {data:sp}=await x.sb.from("ast_student_profiles")
+      .select("target_exam,batch,bio")
+      .eq("user_id",x.user.id)
+      .maybeSingle();
+
+    const el=contentEl();
+    el.innerHTML=
+      "<b>👤 Student Profile</b>"+
+      "<div class='bank-item'>"+
+      "<b>"+esc((p&&p.full_name)||"Student")+"</b><br>"+
+      "<span class='small'>Student ID: "+esc((p&&p.student_id)||"")+"<br>"+
+      "Role: "+esc((p&&p.role)||"student")+"</span>"+
+      "</div>"+
+      "<div class='bank-item'>"+
+      "<label>Target Exam</label>"+
+      "<input id='astProfileExam' value='"+esc((sp&&sp.target_exam)||"TNPSC")+"'>"+
+      "<label>Batch</label>"+
+      "<input id='astProfileBatch' value='"+esc((sp&&sp.batch)||"")+"'>"+
+      "<label>About</label>"+
+      "<textarea id='astProfileBio' rows='3'>"+esc((sp&&sp.bio)||"")+"</textarea>"+
+      "<button class='tool' id='astSaveProfile'>💾 Save Profile</button>"+
+      "</div>";
+
+    document.getElementById("astSaveProfile").onclick=async function(){
+      const row={
+        user_id:x.user.id,
+        target_exam:document.getElementById("astProfileExam").value.trim(),
+        batch:document.getElementById("astProfileBatch").value.trim(),
+        bio:document.getElementById("astProfileBio").value.trim(),
+        updated_at:new Date().toISOString()
+      };
+      const r=await x.sb.from("ast_student_profiles").upsert(row,{onConflict:"user_id"});
+      if(r.error) alert("Profile save error: "+r.error.message);
+      else alert("Profile saved successfully.");
+    };
+  }
+
+  async function showProgress(){
+    const x=await getSession();
+    if(!x.user){alert("Please login first.");return;}
+
+    const r=await x.sb.rpc("ast_student_progress");
+    const s=r.data && r.data[0] ? r.data[0] : {
+      tests:0,questions:0,correct:0,accuracy:0,best:0
+    };
+
+    const sub=await x.sb.rpc("ast_student_subjects");
+    const rows=sub.data||[];
+
+    let html=
+      "<b>📊 My Progress</b>"+
+      "<div class='stat-grid'>"+
+      "<div class='stat'><b>"+(s.tests||0)+"</b>Tests</div>"+
+      "<div class='stat'><b>"+(s.questions||0)+"</b>Questions</div>"+
+      "<div class='stat'><b>"+(s.accuracy||0)+"%</b>Accuracy</div>"+
+      "<div class='stat'><b>"+(s.best||0)+"%</b>Best Score</div>"+
+      "</div>"+
+      "<div class='bank-item'><b>Overall</b><br>"+
+      (s.correct||0)+" correct out of "+(s.questions||0)+" questions.</div>";
+
+    if(rows.length){
+      html+="<b>📚 Subject-wise</b>";
+      rows.forEach(function(a){
+        html+="<div class='bank-item'><b>"+esc(a.subject)+"</b><br>"+
+          (a.tests||0)+" tests • "+(a.correct||0)+"/"+(a.total||0)+
+          " correct • "+(a.accuracy||0)+"% accuracy</div>";
+      });
+    }
+
+    contentEl().innerHTML=html;
+  }
+
+  async function showBadges(){
+    const x=await getSession();
+    if(!x.user){alert("Please login first.");return;}
+
+    await x.sb.rpc("ast_award_badges");
+
+    const r=await x.sb.from("ast_student_badges")
+      .select("badge_code,earned_at")
+      .eq("user_id",x.user.id)
+      .order("earned_at",{ascending:false});
+
+    const b=await x.sb.from("ast_badges")
+      .select("code,title,description");
+
+    const earned={};
+    (r.data||[]).forEach(function(z){earned[z.badge_code]=z.earned_at;});
+
+    let html="<b>🏅 My Badges</b>";
+
+    (b.data||[]).forEach(function(z){
+      const yes=!!earned[z.code];
+      html+="<div class='bank-item'>"+
+        "<b>"+(yes?"🏅":"🔒")+" "+esc(z.title)+"</b><br>"+
+        "<span class='small'>"+esc(z.description)+"</span>"+
+        (yes?"<br><span class='small'>Earned: "+new Date(earned[z.code]).toLocaleDateString()+"</span>":"")+
+        "</div>";
+    });
+
+    contentEl().innerHTML=html;
+  }
+
+  async function showAssignments(){
+    const x=await getSession();
+    if(!x.user){alert("Please login first.");return;}
+
+    const r=await x.sb.from("ast_assignments")
+      .select("*")
+      .or("assigned_to.eq."+x.user.id+",assigned_to.is.null")
+      .order("created_at",{ascending:false});
+
+    if(r.error){
+      contentEl().innerHTML="<b>📝 My Assignments</b><div class='bank-item'>"+esc(r.error.message)+"</div>";
+      return;
+    }
+
+    const rows=r.data||[];
+    if(!rows.length){
+      contentEl().innerHTML="<b>📝 My Assignments</b><div class='bank-item'>No assignments yet.</div>";
+      return;
+    }
+
+    let html="<b>📝 My Assignments</b>";
+
+    rows.forEach(function(a){
+      const due=a.due_at ? new Date(a.due_at).toLocaleString() : "No due date";
+      html+="<div class='bank-item'>"+
+        "<b>"+esc(a.title)+"</b><br>"+
+        "<span class='small'>"+esc(a.instructions||"")+
+        "<br>Due: "+esc(due)+"</span>"+
+        "</div>";
+    });
+
+    contentEl().innerHTML=html;
+  }
+
+  async function showAnnouncements(){
+    const x=await getSession();
+    if(!x.user){alert("Please login first.");return;}
+
+    const r=await x.sb.from("ast_announcements")
+      .select("title,message,created_at")
+      .eq("active",true)
+      .order("created_at",{ascending:false})
+      .limit(30);
+
+    if(r.error){
+      contentEl().innerHTML="<b>📢 Announcements</b><div class='bank-item'>"+esc(r.error.message)+"</div>";
+      return;
+    }
+
+    const rows=r.data||[];
+    if(!rows.length){
+      contentEl().innerHTML="<b>📢 Announcements</b><div class='bank-item'>No announcements yet.</div>";
+      return;
+    }
+
+    contentEl().innerHTML="<b>📢 Announcements</b>"+
+      rows.map(function(a){
+        return "<div class='bank-item'><b>"+esc(a.title)+"</b><br>"+
+          "<span class='small'>"+esc(a.message)+"<br>"+
+          new Date(a.created_at).toLocaleString()+"</span></div>";
+      }).join("");
+  }
+
+  async function showNotifications(){
+    const x=await getSession();
+    if(!x.user){alert("Please login first.");return;}
+
+    const r=await x.sb.from("ast_notifications")
+      .select("id,title,message,read_at,created_at")
+      .eq("user_id",x.user.id)
+      .order("created_at",{ascending:false})
+      .limit(50);
+
+    if(r.error){
+      contentEl().innerHTML="<b>🔔 Notifications</b><div class='bank-item'>"+esc(r.error.message)+"</div>";
+      return;
+    }
+
+    const rows=r.data||[];
+    if(!rows.length){
+      contentEl().innerHTML="<b>🔔 Notifications</b><div class='bank-item'>No notifications.</div>";
+      return;
+    }
+
+    let html="<b>🔔 Notifications</b>";
+
+    rows.forEach(function(a){
+      html+="<div class='bank-item'>"+
+        "<b>"+(a.read_at?"":"🆕 ")+esc(a.title)+"</b><br>"+
+        "<span class='small'>"+esc(a.message)+"<br>"+
+        new Date(a.created_at).toLocaleString()+"</span>";
+
+      if(!a.read_at){
+        html+="<br><button class='tool astReadBtn' data-id='"+esc(a.id)+"'>Mark as read</button>";
+      }
+
+      html+="</div>";
+    });
+
+    contentEl().innerHTML=html;
+
+    document.querySelectorAll(".astReadBtn").forEach(function(btn){
+      btn.onclick=async function(){
+        const id=btn.getAttribute("data-id");
+        await x.sb.from("ast_notifications")
+          .update({read_at:new Date().toISOString()})
+          .eq("id",id)
+          .eq("user_id",x.user.id);
+        showNotifications();
+      };
+    });
+  }
+
+  async function showReport(){
+    const x=await getSession();
+    if(!x.user){alert("Please login first.");return;}
+
+    const p=await x.sb.rpc("ast_student_progress");
+    const s=p.data && p.data[0] ? p.data[0] : {};
+    const sub=await x.sb.rpc("ast_student_subjects");
+
+    const profile=await x.sb.from("profiles")
+      .select("full_name,student_id")
+      .eq("id",x.user.id)
+      .maybeSingle();
+
+    let html=
+      "<b>📄 Performance Report</b>"+
+      "<div class='bank-item'>"+
+      "<b>"+esc((profile.data&&profile.data.full_name)||"Student")+"</b><br>"+
+      "Student ID: "+esc((profile.data&&profile.data.student_id)||"")+"<br>"+
+      "Tests: "+(s.tests||0)+"<br>"+
+      "Questions: "+(s.questions||0)+"<br>"+
+      "Correct: "+(s.correct||0)+"<br>"+
+      "Overall Accuracy: "+(s.accuracy||0)+"%<br>"+
+      "Best Score: "+(s.best||0)+"%"+
+      "</div>";
+
+    (sub.data||[]).forEach(function(a){
+      html+="<div class='bank-item'><b>"+esc(a.subject)+"</b><br>"+
+        "Tests: "+a.tests+" • Accuracy: "+a.accuracy+"%</div>";
+    });
+
+    html+="<button class='tool' onclick='window.print()'>🖨️ Print / Save PDF</button>";
+
+    contentEl().innerHTML=html;
+  }
+
+  /* ---------------- ADMIN TOOLS ---------------- */
+
+  async function isStaff(sb,user){
+    if(!user) return false;
+    const r=await sb.from("profiles")
+      .select("role")
+      .eq("id",user.id)
+      .maybeSingle();
+    return !!(r.data && (r.data.role==="admin" || r.data.role==="teacher"));
+  }
+
+  async function showAdmin2(){
+    const x=await getSession();
+    if(!x.user){alert("Please login first.");return;}
+
+    if(!(await isStaff(x.sb,x.user))){
+      alert("Admin/Teacher access only.");
+      return;
+    }
+
+    contentEl().innerHTML=
+      "<b>👨‍🏫 ASTHIRA Staff Centre</b>"+
+      "<div class='bank-item'>"+
+      "<button class='tool' id='astMakeAnnouncement'>📢 New Announcement</button>"+
+      "<button class='tool' id='astAssignTest'>📝 Assign Test</button>"+
+      "</div>"+
+      "<div class='bank-item'>"+
+      "<span class='small'>Use these tools to send announcements and assign question sets to students.</span>"+
+      "</div>";
+
+    document.getElementById("astMakeAnnouncement").onclick=async function(){
+      const title=prompt("Announcement title:");
+      if(!title) return;
+      const msg=prompt("Announcement message:");
+      if(!msg) return;
+
+      const r=await x.sb.rpc("ast_admin_announce",{
+        p_title:title,
+        p_message:msg
+      });
+
+      if(r.error) alert("Error: "+r.error.message);
+      else alert("Announcement sent to students.");
+    };
+
+    document.getElementById("astAssignTest").onclick=async function(){
+      const title=prompt("Assignment title:");
+      if(!title) return;
+
+      const instructions=prompt("Instructions:")||"";
+      const studentId=prompt("Student UUID (leave blank for all students):")||"";
+      const questionSetId=prompt("Question Set UUID (optional):")||"";
+      const due=prompt("Due date/time ISO format (optional):")||"";
+
+      const r=await x.sb.rpc("ast_admin_assign",{
+        p_title:title,
+        p_instructions:instructions,
+        p_question_set_id:questionSetId||null,
+        p_assigned_to:studentId||null,
+        p_due_at:due||null
+      });
+
+      if(r.error) alert("Error: "+r.error.message);
+      else alert("Assignment created successfully.");
+    };
+  }
+
+  /* Add the new tools after existing dashboard is available. */
+  function install(){
+    ensureButtons();
+
+    const bar=document.querySelector(".dashboard .toolbar");
+    if(bar && !document.getElementById("ast20StaffBtn")){
+      const b=document.createElement("button");
+      b.id="ast20StaffBtn";
+      b.className="tool";
+      b.textContent="👨‍🏫 Staff Centre";
+      b.onclick=showAdmin2;
+      bar.appendChild(b);
+    }
+  }
+
+  try{
+    const x=await getSession();
+    if(x.user){
+      install();
+
+      /* Automatically award any newly earned badges. */
+      await x.sb.rpc("ast_award_badges");
+
+      /* Refresh buttons after login/session changes. */
+      setTimeout(install,500);
+      setTimeout(install,1500);
+    }
+
+    const sb=x.sb;
+    sb.auth.onAuthStateChange(function(event,session){
+      if(session && session.user){
+        setTimeout(async function(){
+          install();
+          try{ await sb.rpc("ast_award_badges"); }catch(e){}
+        },400);
+      }
+    });
+  }catch(e){
+    console.error("ASTHIRA AI 2.0:",e);
+  }
+
+})();
+</script>
 </body>
 </html>
