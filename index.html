@@ -2324,5 +2324,585 @@ render=function(qs){
 
 })();
 </script>
+  <script>
+/* =========================================================
+   ASTHIRA AI — DYNAMIC CURRICULUM SELECTOR
+   ========================================================= */
+
+(function(){
+
+  function esc(v){
+    return String(v == null ? "" : v)
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;")
+      .replace(/'/g,"&#039;");
+  }
+
+  function waitForSB(){
+    return new Promise(function(resolve,reject){
+
+      let tries=0;
+
+      function check(){
+
+        if(window.supabaseClient){
+          resolve(window.supabaseClient);
+          return;
+        }
+
+        tries++;
+
+        if(tries>60){
+          reject(new Error("Supabase connection timeout"));
+          return;
+        }
+
+        setTimeout(check,250);
+      }
+
+      check();
+    });
+  }
+
+
+  async function loadCurriculum(){
+
+    const sb=await waitForSB();
+
+    const subject=document.getElementById("subject");
+    const exam=document.getElementById("exam");
+    const topic=document.getElementById("topic");
+
+    if(!subject || !exam || !topic)return;
+
+
+    /* -----------------------------------------------------
+       CREATE NEW CURRICULUM CONTROLS
+       ----------------------------------------------------- */
+
+    if(document.getElementById("astCurriculumBox"))return;
+
+
+    const box=document.createElement("div");
+
+    box.id="astCurriculumBox";
+
+    box.innerHTML=`
+
+      <label>Category</label>
+      <select id="astCategory">
+        <option value="">Select Category</option>
+        <option value="School">🏫 School</option>
+        <option value="Competitive">🎯 Competitive Exams</option>
+      </select>
+
+      <label>Board / Exam</label>
+      <select id="astBoard">
+        <option value="">Select Board / Exam</option>
+      </select>
+
+      <label>Class / Level</label>
+      <select id="astLevel">
+        <option value="">Select Class / Level</option>
+      </select>
+
+      <label>Subject</label>
+      <select id="astCurriculumSubject">
+        <option value="">Select Subject</option>
+      </select>
+
+      <label>Chapter / Topic</label>
+      <select id="astCurriculumTopic">
+        <option value="">General / All Topics</option>
+      </select>
+
+    `;
+
+
+    /* Insert before old Exam field */
+
+    const examGrid=exam.closest(".grid");
+
+    if(examGrid){
+
+      examGrid.parentNode.insertBefore(
+        box,
+        examGrid
+      );
+
+    }
+
+
+    /* Hide old controls.
+       Their values are still used by the existing generator. */
+
+    examGrid.style.display="none";
+
+    topic.style.display="none";
+
+    const topicLabel=topic.previousElementSibling;
+
+    if(topicLabel && topicLabel.tagName==="LABEL"){
+      topicLabel.style.display="none";
+    }
+
+
+    const category=
+      document.getElementById("astCategory");
+
+    const board=
+      document.getElementById("astBoard");
+
+    const level=
+      document.getElementById("astLevel");
+
+    const currSubject=
+      document.getElementById("astCurriculumSubject");
+
+    const currTopic=
+      document.getElementById("astCurriculumTopic");
+
+
+    /* -----------------------------------------------------
+       CATEGORY
+       ----------------------------------------------------- */
+
+    category.onchange=async function(){
+
+      board.innerHTML=
+        "<option value=''>Loading...</option>";
+
+      level.innerHTML=
+        "<option value=''>Select Class / Level</option>";
+
+      currSubject.innerHTML=
+        "<option value=''>Select Subject</option>";
+
+      currTopic.innerHTML=
+        "<option value=''>General / All Topics</option>";
+
+
+      if(!this.value){
+
+        board.innerHTML=
+          "<option value=''>Select Board / Exam</option>";
+
+        return;
+      }
+
+
+      const r=await sb
+        .from("ast_exam_catalog")
+        .select("exam_board,display_name")
+        .eq("category",this.value)
+        .eq("is_active",true)
+        .order("display_name");
+
+
+      if(r.error){
+
+        board.innerHTML=
+          "<option value=''>Error loading</option>";
+
+        alert(r.error.message);
+
+        return;
+      }
+
+
+      board.innerHTML=
+        "<option value=''>Select Board / Exam</option>";
+
+
+      (r.data||[]).forEach(function(x){
+
+        board.innerHTML+=
+          "<option value='"+esc(x.exam_board)+"'>"+
+          esc(x.display_name)+
+          "</option>";
+
+      });
+
+    };
+
+
+    /* -----------------------------------------------------
+       BOARD / EXAM
+       ----------------------------------------------------- */
+
+    board.onchange=async function(){
+
+      level.innerHTML=
+        "<option value=''>Loading...</option>";
+
+      currSubject.innerHTML=
+        "<option value=''>Select Subject</option>";
+
+      currTopic.innerHTML=
+        "<option value=''>General / All Topics</option>";
+
+
+      if(!this.value){
+
+        level.innerHTML=
+          "<option value=''>Select Class / Level</option>";
+
+        return;
+      }
+
+
+      const r=await sb.rpc(
+        "ast_get_curriculum",
+        {
+          p_category:category.value,
+          p_exam_board:this.value,
+          p_level:null,
+          p_subject:null
+        }
+      );
+
+
+      if(r.error){
+
+        alert(r.error.message);
+        return;
+
+      }
+
+
+      const levels=[];
+
+      (r.data||[]).forEach(function(x){
+
+        if(x.level && !levels.includes(x.level)){
+          levels.push(x.level);
+        }
+
+      });
+
+
+      level.innerHTML=
+        "<option value=''>Select Class / Level</option>";
+
+
+      levels.forEach(function(x){
+
+        level.innerHTML+=
+          "<option value='"+esc(x)+"'>"+
+          esc(x)+
+          "</option>";
+
+      });
+
+
+      /* Competitive exams can work directly
+         when only one level exists. */
+
+      if(levels.length===1){
+
+        level.value=levels[0];
+
+        level.dispatchEvent(
+          new Event("change")
+        );
+
+      }
+
+    };
+
+
+    /* -----------------------------------------------------
+       LEVEL
+       ----------------------------------------------------- */
+
+    level.onchange=async function(){
+
+      currSubject.innerHTML=
+        "<option value=''>Loading...</option>";
+
+      currTopic.innerHTML=
+        "<option value=''>General / All Topics</option>";
+
+
+      if(!this.value){
+
+        currSubject.innerHTML=
+          "<option value=''>Select Subject</option>";
+
+        return;
+
+      }
+
+
+      const r=await sb.rpc(
+        "ast_get_curriculum",
+        {
+          p_category:category.value,
+          p_exam_board:board.value,
+          p_level:this.value,
+          p_subject:null
+        }
+      );
+
+
+      if(r.error){
+
+        alert(r.error.message);
+        return;
+
+      }
+
+
+      const subjects=[];
+
+
+      (r.data||[]).forEach(function(x){
+
+        if(x.subject &&
+           !subjects.includes(x.subject)){
+
+          subjects.push(x.subject);
+
+        }
+
+      });
+
+
+      currSubject.innerHTML=
+        "<option value=''>Select Subject</option>";
+
+
+      subjects.forEach(function(x){
+
+        currSubject.innerHTML+=
+          "<option value='"+esc(x)+"'>"+
+          esc(x)+
+          "</option>";
+
+      });
+
+
+      if(subjects.length===1){
+
+        currSubject.value=subjects[0];
+
+        currSubject.dispatchEvent(
+          new Event("change")
+        );
+
+      }
+
+    };
+
+
+    /* -----------------------------------------------------
+       SUBJECT
+       ----------------------------------------------------- */
+
+    currSubject.onchange=async function(){
+
+      currTopic.innerHTML=
+        "<option value=''>Loading...</option>";
+
+
+      if(!this.value){
+
+        currTopic.innerHTML=
+          "<option value=''>General / All Topics</option>";
+
+        return;
+
+      }
+
+
+      const r=await sb.rpc(
+        "ast_get_curriculum",
+        {
+          p_category:category.value,
+          p_exam_board:board.value,
+          p_level:level.value,
+          p_subject:this.value
+        }
+      );
+
+
+      if(r.error){
+
+        alert(r.error.message);
+        return;
+
+      }
+
+
+      const topics=[];
+
+
+      (r.data||[]).forEach(function(x){
+
+        const value=
+          x.topic ||
+          x.chapter ||
+          "";
+
+
+        if(value &&
+           !topics.includes(value)){
+
+          topics.push(value);
+
+        }
+
+      });
+
+
+      currTopic.innerHTML=
+        "<option value=''>General / All Topics</option>";
+
+
+      topics.forEach(function(x){
+
+        currTopic.innerHTML+=
+          "<option value='"+esc(x)+"'>"+
+          esc(x)+
+          "</option>";
+
+      });
+
+
+      syncGenerator();
+
+    };
+
+
+    /* -----------------------------------------------------
+       TOPIC
+       ----------------------------------------------------- */
+
+    currTopic.onchange=function(){
+
+      syncGenerator();
+
+    };
+
+
+    /* -----------------------------------------------------
+       CONNECT NEW VALUES TO EXISTING GENERATOR
+       ----------------------------------------------------- */
+
+    function syncGenerator(){
+
+      const c=category.value;
+      const b=board.value;
+      const l=level.value;
+      const s=currSubject.value;
+      const t=currTopic.value;
+
+
+      if(!b || !s)return;
+
+
+      /*
+       Existing backend expects "exam".
+       We create a useful exam name automatically.
+      */
+
+      let examValue=b;
+
+      if(l){
+        examValue+=" • "+l;
+      }
+
+
+      exam.value=examValue;
+
+      subject.innerHTML=
+        "<option value='"+esc(s)+"'>"+
+        esc(s)+
+        "</option>";
+
+      subject.value=s;
+
+
+      topic.value=t;
+
+
+      /* Update page heading */
+
+      const h2=
+        document.querySelector(".builder h2");
+
+      if(h2){
+
+        h2.textContent=
+          "✨ Create Questions";
+
+      }
+
+    }
+
+
+    /* Keep values synced before Generate */
+
+    document
+      .getElementById("generate")
+      .addEventListener("click",function(){
+
+        syncGenerator();
+
+      });
+
+
+    /* Default category */
+
+    category.value="Competitive";
+
+    category.dispatchEvent(
+      new Event("change")
+    );
+
+  }
+
+
+  /* -------------------------------------------------------
+     WAIT UNTIL SUPABASE + PAGE ARE READY
+     ------------------------------------------------------- */
+
+  let attempts=0;
+
+  const timer=setInterval(function(){
+
+    attempts++;
+
+    if(
+      window.supabaseClient &&
+      document.getElementById("exam")
+    ){
+
+      clearInterval(timer);
+
+      loadCurriculum().catch(function(e){
+
+        console.error(
+          "ASTHIRA Curriculum:",
+          e
+        );
+
+      });
+
+    }
+
+    if(attempts>80){
+
+      clearInterval(timer);
+
+    }
+
+  },500);
+
+
+})();
+</script>
 </body>
 </html>
