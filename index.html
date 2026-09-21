@@ -123,16 +123,145 @@ body.answer-only-print .answerKey{display:block!important}
 <select id="language"><option selected>Tamil</option><option>English</option><option>Bilingual</option></select></div>
 </div>
 
-<div class="grid">
-<div><label>Question type</label>
-<select id="qtype">
-<option selected>MCQ</option><option>Assertion-Reason</option><option>Statement Based</option><option>Match the Following</option>
-</select></div>
-<div><label>Number of questions</label>
-<select id="count">
-<option>10</option><option>20</option><option>25</option><option selected>50</option><option>100</option><option>200</option>
-</select></div>
+<div class="bank-item" id="questionTypeBuilder">
+  <b>Question Type & No. of Questions</b>
+
+  <div class="grid">
+
+    <div>
+      <label>MCQ</label>
+      <input type="number" id="qt_mcq" min="0" placeholder="No. of questions">
+    </div>
+
+    <div>
+      <label>Assertion–Reason</label>
+      <input type="number" id="qt_ar" min="0" placeholder="No. of questions">
+    </div>
+
+    <div>
+      <label>Statement Based</label>
+      <input type="number" id="qt_statement" min="0" placeholder="No. of questions">
+    </div>
+
+    <div>
+      <label>Numerical</label>
+      <input type="number" id="qt_numerical" min="0" placeholder="No. of questions">
+    </div>
+
+    <div>
+      <label>Case Based</label>
+      <input type="number" id="qt_case" min="0" placeholder="No. of questions">
+    </div>
+
+    <div>
+      <label>Previous Year Question</label>
+      <input type="number" id="qt_pyq" min="0" placeholder="No. of questions">
+    </div>
+
+    <div>
+      <label>1 Mark Questions</label>
+      <input type="number" id="qt_1" min="0" placeholder="No. of questions">
+    </div>
+
+    <div>
+      <label>2 Mark Questions</label>
+      <input type="number" id="qt_2" min="0" placeholder="No. of questions">
+    </div>
+
+    <div>
+      <label>3 Mark Questions</label>
+      <input type="number" id="qt_3" min="0" placeholder="No. of questions">
+    </div>
+
+    <div>
+      <label>4 Mark Questions</label>
+      <input type="number" id="qt_4" min="0" placeholder="No. of questions">
+    </div>
+
+    <div>
+      <label>5 Mark Questions</label>
+      <input type="number" id="qt_5" min="0" placeholder="No. of questions">
+    </div>
+
+  </div>
+
+  <div class="notice">
+    <b>Total Questions:</b>
+    <span id="qtTotal">0</span>
+    <br>
+    <b>Total Marks:</b>
+    <span id="qtMarks">0</span>
+  </div>
+
+  <!-- Compatibility with existing generator -->
+  <select id="qtype" style="display:none">
+    <option selected>MCQ</option>
+  </select>
+
+  <input id="count" type="hidden" value="10">
 </div>
+
+<script>
+(function(){
+
+  const ids = [
+    "qt_mcq",
+    "qt_ar",
+    "qt_statement",
+    "qt_numerical",
+    "qt_case",
+    "qt_pyq",
+    "qt_1",
+    "qt_2",
+    "qt_3",
+    "qt_4",
+    "qt_5"
+  ];
+
+  function n(id){
+    return Number(
+      document.getElementById(id)?.value || 0
+    );
+  }
+
+  function calculate(){
+
+    const totalQuestions =
+      ids.reduce(function(sum,id){
+        return sum + n(id);
+      },0);
+
+    const totalMarks =
+      n("qt_1") +
+      n("qt_2") * 2 +
+      n("qt_3") * 3 +
+      n("qt_4") * 4 +
+      n("qt_5") * 5;
+
+    document.getElementById("qtTotal").textContent =
+      totalQuestions;
+
+    document.getElementById("qtMarks").textContent =
+      totalMarks;
+
+    /* Keep old generator count compatible */
+    document.getElementById("count").value =
+      totalQuestions || 10;
+  }
+
+  ids.forEach(function(id){
+    const el = document.getElementById(id);
+
+    if(el){
+      el.addEventListener("input",calculate);
+      el.addEventListener("change",calculate);
+    }
+  });
+
+  calculate();
+
+})();
+</script>
 
 <button id="generate" class="primary">✨ Generate Questions</button>
 <div id="status" class="status"></div>
