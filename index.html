@@ -2904,5 +2904,451 @@ render=function(qs){
 
 })();
 </script>
+  <script>
+/* =========================================================
+   ASTHIRA AI — CURRICULUM SELECTOR
+   Category → Exam → Class → Subject → Chapter
+   TOPIC REMOVED
+   ========================================================= */
+
+(function () {
+
+  const SUPABASE_URL =
+    "https://cbfxconoddxqahthdfyy.supabase.co";
+
+  const SUPABASE_KEY =
+    window.__ASTHIRA_SUPABASE_KEY__ || "";
+
+  function getClient() {
+    if (window.supabaseClient) return window.supabaseClient;
+
+    if (window.supabase && SUPABASE_KEY) {
+      window.supabaseClient =
+        window.supabase.createClient(
+          SUPABASE_URL,
+          SUPABASE_KEY
+        );
+      return window.supabaseClient;
+    }
+
+    return null;
+  }
+
+  function findOld(id) {
+    return document.getElementById(id);
+  }
+
+  function makeSelect(id, label) {
+    let old = document.getElementById(id);
+    if (old) return old;
+
+    const wrap = document.createElement("div");
+    wrap.className = "bank-item";
+
+    const lab = document.createElement("label");
+    lab.innerHTML = "<b>" + label + "</b>";
+
+    const sel = document.createElement("select");
+    sel.id = id;
+    sel.className = "tool";
+    sel.style.width = "100%";
+
+    wrap.appendChild(lab);
+    wrap.appendChild(sel);
+
+    const anchor =
+      document.getElementById("exam") ||
+      document.querySelector("select");
+
+    if (anchor && anchor.parentNode) {
+      anchor.parentNode.insertBefore(wrap, anchor);
+    } else {
+      document.body.prepend(wrap);
+    }
+
+    return sel;
+  }
+
+  function fill(sel, rows, placeholder) {
+    sel.innerHTML =
+      "<option value=''>" +
+      placeholder +
+      "</option>";
+
+    rows.forEach(function (r) {
+      const o = document.createElement("option");
+      o.value = r.value;
+      o.textContent = r.label;
+      sel.appendChild(o);
+    });
+
+    sel.disabled = rows.length === 0;
+  }
+
+  const category = makeSelect(
+    "astCategory",
+    "Category"
+  );
+
+  const board = makeSelect(
+    "astBoard",
+    "Board / Exam"
+  );
+
+  const level = makeSelect(
+    "astLevel",
+    "Class / Level"
+  );
+
+  const subject = makeSelect(
+    "astSubject",
+    "Subject"
+  );
+
+  const chapter = makeSelect(
+    "astChapter",
+    "Chapter"
+  );
+
+  fill(category, [
+    {
+      value: "School",
+      label: "School"
+    },
+    {
+      value: "Competitive",
+      label: "Competitive Exams"
+    }
+  ], "Select Category");
+
+  fill(board, [], "Select Board / Exam");
+  fill(level, [], "Select Class / Level");
+  fill(subject, [], "Select Subject");
+  fill(chapter, [], "Select Chapter");
+
+  async function loadBoards() {
+
+    const sb = getClient();
+    if (!sb) return;
+
+    fill(board, [], "Loading...");
+
+    const r = await sb
+      .from("ast_exam_catalog")
+      .select(
+        "exam_board,display_name,level_type"
+      )
+      .eq("category", category.value)
+      .eq("is_active", true)
+      .order("display_name");
+
+    if (r.error) {
+      console.error(r.error);
+      fill(board, [], "Unable to load exams");
+      return;
+    }
+
+    const seen = {};
+
+    const rows = [];
+
+    (r.data || []).forEach(function (x) {
+
+      if (seen[x.exam_board]) return;
+
+      seen[x.exam_board] = true;
+
+      rows.push({
+        value: x.exam_board,
+        label: x.display_name
+      });
+    });
+
+    fill(
+      board,
+      rows,
+      "Select Board / Exam"
+    );
+  }
+
+  async function loadLevels() {
+
+    const sb = getClient();
+    if (!sb || !board.value) return;
+
+    fill(level, [], "Loading...");
+
+    const r = await sb
+      .from("ast_exam_catalog")
+      .select(
+        "exam_board,display_name,level_type"
+      )
+      .eq("category", category.value)
+      .eq("exam_board", board.value)
+      .eq("is_active", true)
+      .order("display_name");
+
+    if (r.error) {
+      console.error(r.error);
+      fill(level, [], "Unable to load levels");
+      return;
+    }
+
+    const rows = [];
+
+    (r.data || []).forEach(function (x) {
+
+      let values = [];
+
+      if (x.level_type) {
+        values = x.level_type
+          .split(",")
+          .map(function (v) {
+            return v.trim();
+          })
+          .filter(Boolean);
+      }
+
+      values.forEach(function (v) {
+
+        rows.push({
+          value: v,
+          label: v
+        });
+
+      });
+
+    });
+
+    const unique = {};
+    const finalRows = [];
+
+    rows.forEach(function (x) {
+
+      if (!unique[x.value]) {
+        unique[x.value] = true;
+        finalRows.push(x);
+      }
+
+    });
+
+    fill(
+      level,
+      finalRows,
+      "Select Class / Level"
+    );
+  }
+
+  async function loadSubjects() {
+
+    const sb = getClient();
+    if (!sb ||
+        !board.value ||
+        !level.value) return;
+
+    fill(subject, [], "Loading...");
+
+    const r = await sb
+      .from("ast_curriculum")
+      .select("subject")
+      .eq("category", category.value)
+      .eq("exam_board", board.value)
+      .eq("level", level.value)
+      .eq("is_active", true)
+      .not("subject", "is", null)
+      .order("subject");
+
+    if (r.error) {
+      console.error(r.error);
+      fill(subject, [], "Unable to load subjects");
+      return;
+    }
+
+    const seen = {};
+    const rows = [];
+
+    (r.data || []).forEach(function (x) {
+
+      if (seen[x.subject]) return;
+
+      seen[x.subject] = true;
+
+      rows.push({
+        value: x.subject,
+        label: x.subject
+      });
+
+    });
+
+    fill(
+      subject,
+      rows,
+      "Select Subject"
+    );
+  }
+
+  async function loadChapters() {
+
+    const sb = getClient();
+    if (!sb ||
+        !board.value ||
+        !level.value ||
+        !subject.value) return;
+
+    fill(chapter, [], "Loading...");
+
+    const r = await sb
+      .from("ast_curriculum")
+      .select("chapter")
+      .eq("category", category.value)
+      .eq("exam_board", board.value)
+      .eq("level", level.value)
+      .eq("subject", subject.value)
+      .eq("is_active", true)
+      .not("chapter", "is", null)
+      .order("chapter");
+
+    if (r.error) {
+      console.error(r.error);
+      fill(
+        chapter,
+        [],
+        "Unable to load chapters"
+      );
+      return;
+    }
+
+    const seen = {};
+    const rows = [];
+
+    (r.data || []).forEach(function (x) {
+
+      if (!x.chapter) return;
+
+      if (seen[x.chapter]) return;
+
+      seen[x.chapter] = true;
+
+      rows.push({
+        value: x.chapter,
+        label: x.chapter
+      });
+
+    });
+
+    fill(
+      chapter,
+      rows,
+      rows.length
+        ? "Select Chapter"
+        : "Chapter not available"
+    );
+  }
+
+  category.addEventListener(
+    "change",
+    async function () {
+
+      fill(board, [], "Select Board / Exam");
+      fill(level, [], "Select Class / Level");
+      fill(subject, [], "Select Subject");
+      fill(chapter, [], "Select Chapter");
+
+      await loadBoards();
+    }
+  );
+
+  board.addEventListener(
+    "change",
+    async function () {
+
+      fill(level, [], "Select Class / Level");
+      fill(subject, [], "Select Subject");
+      fill(chapter, [], "Select Chapter");
+
+      await loadLevels();
+    }
+  );
+
+  level.addEventListener(
+    "change",
+    async function () {
+
+      fill(subject, [], "Select Subject");
+      fill(chapter, [], "Select Chapter");
+
+      await loadSubjects();
+    }
+  );
+
+  subject.addEventListener(
+    "change",
+    async function () {
+
+      fill(chapter, [], "Select Chapter");
+
+      await loadChapters();
+    }
+  );
+
+  chapter.addEventListener(
+    "change",
+    function () {
+
+      /*
+       * Keep the existing generator compatible.
+       * Existing fields are updated before Generate.
+       */
+
+      const oldExam =
+        document.getElementById("exam");
+
+      const oldSubject =
+        document.getElementById("subject");
+
+      const oldTopic =
+        document.getElementById("topic");
+
+      if (oldExam)
+        oldExam.value = board.value;
+
+      if (oldSubject)
+        oldSubject.value = subject.value;
+
+      if (oldTopic)
+        oldTopic.value = chapter.value;
+
+    }
+  );
+
+  /* Hide old exam / subject / topic controls.
+     Our new selector becomes the visible selector. */
+
+  setTimeout(function () {
+
+    [
+      "exam",
+      "subject",
+      "topic"
+    ].forEach(function (id) {
+
+      const el =
+        document.getElementById(id);
+
+      if (!el) return;
+
+      const parent =
+        el.closest(".bank-item") ||
+        el.parentElement;
+
+      if (parent)
+        parent.style.display = "none";
+
+    });
+
+  }, 500);
+
+})();
+</script>
 </body>
 </html>
