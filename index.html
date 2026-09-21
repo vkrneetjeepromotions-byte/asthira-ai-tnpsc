@@ -1028,5 +1028,174 @@ render=function(qs){
   }catch(e){}
 })();
 </script>
+  <script>
+(async function(){
+  function waitSB(){
+    return new Promise(function(resolve,reject){
+      let n=0;
+      (function c(){
+        if(window.supabaseClient)return resolve(window.supabaseClient);
+        if(++n>60)return reject(Error("Supabase connection timeout"));
+        setTimeout(c,250);
+      })();
+    });
+  }
+  function esc2(v){
+    return String(v==null?"":v).replace(/[&<>"']/g,function(x){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[x];
+    });
+  }
+  function csv(rows){
+    return rows.map(function(r){return r.map(function(v){
+      return '"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+    }).join(",")}).join("\n");
+  }
+  async function staff(){
+    const sb=await waitSB(),r=await sb.auth.getSession();
+    if(!r.data.session)return null;
+    const u=r.data.session.user;
+    const p=await sb.from("profiles").select("full_name,student_id,role").eq("id",u.id).maybeSingle();
+    if(!p.data||!["admin","teacher"].includes(p.data.role))return null;
+    return {sb,user:u,profile:p.data};
+  }
+  function box(){
+    return document.getElementById("dashboardContent");
+  }
+  function menu(){
+    return `<div class="toolbar">
+      <button class="tool" onclick="ASTHIRA_ADMIN.home()">🏠 Overview</button>
+      <button class="tool" onclick="ASTHIRA_ADMIN.students()">👥 Students</button>
+      <button class="tool" onclick="ASTHIRA_ADMIN.subjects()">📚 Subjects</button>
+      <button class="tool" onclick="ASTHIRA_ADMIN.dates()">📅 Date Reports</button>
+      <button class="tool" onclick="ASTHIRA_ADMIN.usage()">🧠 Question Usage</button>
+      <button class="tool" onclick="ASTHIRA_ADMIN.roles()">🔐 Roles</button>
+    </div>`;
+  }
+  async function home(){
+    const x=await staff(); if(!x){alert("Staff access only.");return}
+    const r=await x.sb.rpc("staff_student_summary");
+    if(r.error){box().innerHTML=menu()+"<div class='bank-item'>"+esc2(r.error.message)+"</div>";return}
+    const a=r.data||[],tests=a.reduce((n,s)=>n+(+s.tests_count||0),0);
+    const avg=a.length?Math.round(a.reduce((n,s)=>n+(+s.average_percent||0),0)/a.length):0;
+    box().innerHTML=menu()+
+      `<div class="stat-grid">
+       <div class="stat"><b>${a.length}</b>Students</div>
+       <div class="stat"><b>${tests}</b>Tests</div>
+       <div class="stat"><b>${avg}%</b>Student Avg</div>
+      </div>
+      <div class="bank-item"><b>👨‍🏫 ASTHIRA Institute Management</b><br>
+      <span class="small">Logged in as ${esc2(x.profile.full_name||"Staff")} • ${esc2(x.profile.role)}</span></div>
+      <div class="bank-item"><b>⚡ Quick actions</b><br>
+      Use Students for individual reports, Subjects for subject analytics, Date Reports for daily performance, Question Usage for generation statistics, and Roles for teacher management.</div>`;
+  }
+  async function students(){
+    const x=await staff(); if(!x){alert("Staff access only.");return}
+    const r=await x.sb.rpc("staff_student_summary");
+    if(r.error){box().innerHTML=menu()+"<div class='bank-item'>"+esc2(r.error.message)+"</div>";return}
+    const a=r.data||[];
+    box().innerHTML=menu()+
+      `<input id="astStudentSearch" placeholder="Search student name or ID" oninput="ASTHIRA_ADMIN.filterStudents()">`+
+      `<div id="astStudentList"></div>`;
+    window._astStudents=a;filterStudents();
+  }
+  function filterStudents(){
+    const q=(document.getElementById("astStudentSearch")?.value||"").toLowerCase();
+    const a=(window._astStudents||[]).filter(s=>
+      String(s.full_name||"").toLowerCase().includes(q)||
+      String(s.student_id||"").toLowerCase().includes(q));
+    document.getElementById("astStudentList").innerHTML=a.map(s=>
+      `<div class="bank-item"><b>${esc2(s.full_name||"Student")}</b><br>
+      <span class="small">${esc2(s.student_id)} • ${esc2(s.role)} • ${s.tests_count} tests • ${s.average_percent}% avg • Best ${s.best_percent}%</span>
+      <br><button class="tool" onclick="ASTHIRA_ADMIN.detail('${esc2(s.student_id)}')">📊 View Report</button></div>`
+    ).join("")||"<div class='bank-item'>No students found.</div>";
+  }
+  async function detail(id){
+    const x=await staff();if(!x)return;
+    const r=await x.sb.rpc("admin_student_details",{p_student_id:id});
+    if(r.error){box().innerHTML=menu()+"<div class='bank-item'>"+esc2(r.error.message)+"</div>";return}
+    const a=r.data||[],p=a[0]||{};
+    const total=a.reduce((n,t)=>n+(+t.total||0),0),correct=a.reduce((n,t)=>n+(+t.correct||0),0);
+    box().innerHTML=menu()+
+      `<div class="bank-item"><b>${esc2(p.full_name||id)}</b><br>
+      <span class="small">${esc2(p.student_id||id)} • Role: ${esc2(p.role||"student")}</span><br>
+      <b>${a.length} tests • ${correct}/${total} correct • ${total?Math.round(correct/total*100):0}% accuracy</b></div>`+
+      (a.filter(t=>t.completed_at).map(t=>
+      `<div class="bank-item"><b>${esc2(t.title||"Test")}</b><br>
+      <span class="small">${esc2(t.subject||"General")} • ${esc2(t.topic||"")} • ${t.correct}/${t.total} • ${t.percent}% • ${new Date(t.completed_at).toLocaleString("en-IN")}</span></div>`).join("")||
+      "<div class='bank-item'>No completed tests yet.</div>")+
+      `<button class="tool" onclick="ASTHIRA_ADMIN.exportStudent('${esc2(id)}')">📥 Export Student Report</button>`;
+  }
+  async function exportStudent(id){
+    const x=await staff();if(!x)return;
+    const r=await x.sb.rpc("admin_student_details",{p_student_id:id});
+    if(r.error){alert(r.error.message);return}
+    const a=r.data||[],rows=[["Student","Student ID","Role","Test","Exam","Subject","Topic","Correct","Total","Percent","Completed"]];
+    a.forEach(t=>rows.push([t.full_name,t.student_id,t.role,t.title,t.exam,t.subject,t.topic,t.correct,t.total,t.percent,t.completed_at]));
+    const blob=new Blob([csv(rows)],{type:"text/csv"});
+    const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download=(id||"student")+"_report.csv";link.click();
+  }
+  async function subjects(){
+    const x=await staff();if(!x)return;
+    const r=await x.sb.rpc("admin_subject_summary");
+    if(r.error){box().innerHTML=menu()+"<div class='bank-item'>"+esc2(r.error.message)+"</div>";return}
+    box().innerHTML=menu()+"<b>📚 Subject-wise Institute Performance</b>"+
+      (r.data||[]).map(s=>`<div class="bank-item"><b>${esc2(s.subject)}</b><br>
+      <span class="small">${s.tests} tests • ${s.correct}/${s.total} correct • ${s.accuracy}% accuracy</span></div>`).join("")||
+      "<div class='bank-item'>No test data yet.</div>";
+  }
+  async function dates(){
+    const x=await staff();if(!x)return;
+    const r=await x.sb.rpc("admin_date_summary");
+    if(r.error){box().innerHTML=menu()+"<div class='bank-item'>"+esc2(r.error.message)+"</div>";return}
+    box().innerHTML=menu()+"<b>📅 Daily Institute Performance</b>"+
+      (r.data||[]).map(s=>`<div class="bank-item"><b>${esc2(s.test_date)}</b><br>
+      <span class="small">${s.tests} tests • ${s.correct}/${s.total} correct • ${s.accuracy}% accuracy</span></div>`).join("")||
+      "<div class='bank-item'>No test data yet.</div>";
+  }
+  async function usage(){
+    const x=await staff();if(!x)return;
+    const r=await x.sb.rpc("admin_question_usage");
+    if(r.error){box().innerHTML=menu()+"<div class='bank-item'>"+esc2(r.error.message)+"</div>";return}
+    box().innerHTML=menu()+"<b>🧠 Question Generation Usage</b>"+
+      (r.data||[]).map(s=>`<div class="bank-item"><b>${esc2(s.full_name||"Student")}</b><br>
+      <span class="small">${esc2(s.student_id)} • ${s.question_sets} sets • ${s.questions_generated} questions${s.last_created_at?" • Last "+new Date(s.last_created_at).toLocaleString("en-IN"):""}</span></div>`).join("")||
+      "<div class='bank-item'>No question sets yet.</div>";
+  }
+  async function roles(){
+    const x=await staff();if(!x)return;
+    if(x.profile.role!=="admin"){box().innerHTML=menu()+"<div class='bank-item'><b>🔐 Admin only</b><br>Only an administrator can change student/teacher roles.</div>";return}
+    box().innerHTML=menu()+`
+      <div class="bank-item"><b>👨‍🏫 Teacher / Admin Management</b><br>
+      <span class="small">The person must first create a normal ASTHIRA account. Then enter their Student ID here.</span>
+      <label>Student ID</label><input id="astRoleId" placeholder="Example: ASTHIRA002">
+      <label>New Role</label><select id="astRole"><option value="student">Student</option><option value="teacher">Teacher</option><option value="admin">Admin</option></select>
+      <button class="primary" onclick="ASTHIRA_ADMIN.setRole()">Save Role</button>
+      </div>`;
+  }
+  async function setRole(){
+    const x=await staff();if(!x||x.profile.role!=="admin"){alert("Admin access only.");return}
+    const id=(document.getElementById("astRoleId").value||"").trim(),role=document.getElementById("astRole").value;
+    if(!id){alert("Enter Student ID.");return}
+    const r=await x.sb.rpc("admin_set_user_role",{p_student_id:id,p_role:role});
+    if(r.error){alert(r.error.message);return}
+    if(!r.data){alert("Student ID not found.");return}
+    alert("Role updated successfully.");
+    students();
+  }
+  window.ASTHIRA_ADMIN={home,students,filterStudents,detail,subjects,dates,usage,roles,setRole,exportStudent};
+  try{
+    const x=await staff();
+    if(!x)return;
+    const bar=document.querySelector(".dashboard .toolbar");
+    if(!bar)return;
+    let b=document.getElementById("adminDashboardBtn")||document.getElementById("staffDashboardBtn");
+    if(!b){
+      b=document.createElement("button");b.id="staffDashboardBtn";b.className="tool";bar.appendChild(b);
+    }
+    b.textContent=x.profile.role==="admin"?"👨‍🏫 Institute Admin":"👨‍🏫 Teacher Dashboard";
+    b.onclick=home;
+  }catch(e){console.error("ASTHIRA staff dashboard:",e)}
+})();
+</script>
 </body>
 </html>
