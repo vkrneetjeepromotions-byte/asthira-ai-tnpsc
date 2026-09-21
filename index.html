@@ -3164,28 +3164,6 @@ render=function(qs){
       return;
     }
 
-    const seen = {};
-    const rows = [];
-
-    (r.data || []).forEach(function (x) {
-
-      if (seen[x.subject]) return;
-
-      seen[x.subject] = true;
-
-      rows.push({
-        value: x.subject,
-        label: x.subject
-      });
-
-    });
-
-    fill(
-      subject,
-      rows,
-      "Select Subject"
-    );
-  }
 
   async function loadChapters() {
 
