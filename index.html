@@ -3457,5 +3457,510 @@ render=function(qs){
 
 })();
 </script>
+  <script>
+/* =========================================================
+   ASTHIRA AI — MIXED QUESTION PAPER GENERATOR
+   Connects 11 question-type count boxes to /api/generate-paper
+   ========================================================= */
+
+(function () {
+
+  const typeMap = {
+    qt_mcq: "MCQ",
+    qt_ar: "Assertion–Reason",
+    qt_statement: "Statement Based",
+    qt_numerical: "Numerical",
+    qt_case: "Case Based",
+    qt_pyq: "Previous Year Question",
+    qt_1: "1 Mark Questions",
+    qt_2: "2 Mark Questions",
+    qt_3: "3 Mark Questions",
+    qt_4: "4 Mark Questions",
+    qt_5: "5 Mark Questions"
+  };
+
+  function getNumber(id) {
+    const el = document.getElementById(id);
+    if (!el) return 0;
+
+    const value = Number(el.value || 0);
+
+    if (!Number.isFinite(value) || value < 0) return 0;
+
+    return Math.floor(value);
+  }
+
+  function getQuestionCounts() {
+
+    const counts = {};
+
+    Object.keys(typeMap).forEach(function (id) {
+      counts[typeMap[id]] = getNumber(id);
+    });
+
+    return counts;
+  }
+
+  function getTotalQuestions(counts) {
+
+    return Object.values(counts).reduce(function (sum, value) {
+      return sum + value;
+    }, 0);
+  }
+
+  function getTotalMarks(counts) {
+
+    return (
+      counts["1 Mark Questions"] * 1 +
+      counts["2 Mark Questions"] * 2 +
+      counts["3 Mark Questions"] * 3 +
+      counts["4 Mark Questions"] * 4 +
+      counts["5 Mark Questions"] * 5
+    );
+  }
+
+  function escapeHTML(value) {
+
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function sectionName(questionType) {
+
+    const map = {
+      "1 Mark Questions": "Section A — 1 Mark Questions",
+      "2 Mark Questions": "Section B — 2 Mark Questions",
+      "3 Mark Questions": "Section C — 3 Mark Questions",
+      "4 Mark Questions": "Section D — 4 Mark Questions",
+      "5 Mark Questions": "Section E — 5 Mark Questions",
+      "MCQ": "Section F — MCQ",
+      "Assertion–Reason": "Section G — Assertion–Reason",
+      "Statement Based": "Section H — Statement Based",
+      "Numerical": "Section I — Numerical",
+      "Case Based": "Section J — Case Based",
+      "Previous Year Question": "Section K — Previous Year Questions"
+    };
+
+    return map[questionType] || questionType;
+  }
+
+  function renderMixedPaper(questions) {
+
+    const container = document.getElementById("questions");
+
+    if (!container) {
+      console.error("ASTHIRA: questions container not found.");
+      return;
+    }
+
+    window.lastQuestions = questions;
+
+    const order = [
+      "1 Mark Questions",
+      "2 Mark Questions",
+      "3 Mark Questions",
+      "4 Mark Questions",
+      "5 Mark Questions",
+      "MCQ",
+      "Assertion–Reason",
+      "Statement Based",
+      "Numerical",
+      "Case Based",
+      "Previous Year Question"
+    ];
+
+    let html = "";
+
+    order.forEach(function (type) {
+
+      const group = questions.filter(function (q) {
+        return q.questionType === type;
+      });
+
+      if (!group.length) return;
+
+      html += `
+        <div class="paper-section">
+          ${escapeHTML(sectionName(type))}
+        </div>
+      `;
+
+      group.forEach(function (q, index) {
+
+        const globalIndex = questions.indexOf(q);
+
+        let optionsHTML = "";
+
+        if (Array.isArray(q.options) && q.options.length) {
+
+          optionsHTML = `
+            <div class="question-options">
+              ${q.options.map(function (option, i) {
+
+                const letter = String.fromCharCode(65 + i);
+
+                return `
+                  <div>
+                    <b>${letter}.</b>
+                    ${escapeHTML(option)}
+                  </div>
+                `;
+
+              }).join("")}
+            </div>
+          `;
+        }
+
+        const marksHTML =
+          q.marks > 0
+            ? `<span class="question-marks">[${q.marks} Mark${q.marks > 1 ? "s" : ""}]</span>`
+            : "";
+
+        html += `
+          <div class="question-card">
+
+            <div class="question-title">
+              <b>${globalIndex + 1}.</b>
+              ${escapeHTML(q.question)}
+              ${marksHTML}
+            </div>
+
+            ${optionsHTML}
+
+          </div>
+        `;
+      });
+    });
+
+    container.innerHTML = html;
+
+    const results = document.getElementById("results");
+
+    if (results) {
+      results.style.display = "block";
+    }
+
+    window.scrollTo({
+      top: results ? results.offsetTop : 0,
+      behavior: "smooth"
+    });
+  }
+
+  /* Add section styling without changing existing font sizes */
+  if (!document.getElementById("asthira-paper-section-style")) {
+
+    const style = document.createElement("style");
+
+    style.id = "asthira-paper-section-style";
+
+    style.textContent = `
+      .paper-section {
+        font-weight: 800;
+        margin: 18px 0 10px;
+        padding: 8px 10px;
+        border-bottom: 2px solid currentColor;
+        break-after: avoid;
+        page-break-after: avoid;
+        column-span: all;
+      }
+
+      .question-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        margin-bottom: 12px;
+      }
+
+      .question-marks {
+        float: right;
+        font-weight: 700;
+        margin-left: 8px;
+      }
+
+      .question-options {
+        margin: 7px 0 0 24px;
+      }
+
+      .question-options div {
+        margin: 3px 0;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  /*
+    Replace the old Generate button action.
+    Existing generator remains untouched.
+  */
+
+  const generateButton = document.getElementById("generate");
+
+  if (!generateButton) {
+    console.error("ASTHIRA: Generate button not found.");
+    return;
+  }
+
+  generateButton.onclick = async function () {
+
+    const counts = getQuestionCounts();
+
+    const totalQuestions = getTotalQuestions(counts);
+    const totalMarks = getTotalMarks(counts);
+
+    if (totalQuestions <= 0) {
+
+      if (typeof status === "function") {
+        status(
+          "Please enter the number of questions for at least one question type.",
+          true
+        );
+      } else {
+        alert(
+          "Please enter the number of questions for at least one question type."
+        );
+      }
+
+      return;
+    }
+
+    if (totalQuestions > 200) {
+
+      if (typeof status === "function") {
+        status("Maximum 200 questions per paper.", true);
+      } else {
+        alert("Maximum 200 questions per paper.");
+      }
+
+      return;
+    }
+
+    this.disabled = true;
+
+    if (typeof status === "function") {
+      status("Generating your ASTHIRA question paper…");
+    }
+
+    const results = document.getElementById("results");
+
+    if (results) {
+      results.style.display = "none";
+    }
+
+    try {
+
+      let fileData = null;
+
+      if (typeof selectedFile !== "undefined" && selectedFile) {
+
+        if (selectedFile.size > 3 * 1024 * 1024) {
+
+          throw new Error(
+            "Please use a PDF/image under 3 MB."
+          );
+        }
+
+        if (typeof dataURL === "function") {
+          fileData = await dataURL(selectedFile);
+        } else {
+
+          fileData = await new Promise(function (resolve, reject) {
+
+            const reader = new FileReader();
+
+            reader.onload = function () {
+              resolve(reader.result);
+            };
+
+            reader.onerror = reject;
+
+            reader.readAsDataURL(selectedFile);
+          });
+        }
+      }
+
+      const exam =
+        document.getElementById("exam")?.value || "";
+
+      const subject =
+        document.getElementById("subject")?.value || "";
+
+      const chapter =
+        document.getElementById("topic")?.value?.trim() || "";
+
+      const difficulty =
+        document.getElementById("difficulty")?.value || "Very Tough";
+
+      const language =
+        document.getElementById("language")?.value || "Tamil";
+
+      const fileName =
+        typeof selectedFile !== "undefined" && selectedFile
+          ? selectedFile.name
+          : "";
+
+      /*
+        Keep hidden compatibility fields updated.
+      */
+
+      const countElement = document.getElementById("count");
+
+      if (countElement) {
+        countElement.value = totalQuestions;
+      }
+
+      const qtypeElement = document.getElementById("qtype");
+
+      if (qtypeElement) {
+        qtypeElement.value = "Mixed Paper";
+      }
+
+      const payload = {
+
+        exam: exam,
+
+        subject: subject,
+
+        chapter: chapter,
+
+        difficulty: difficulty,
+
+        language: language,
+
+        questionCounts: counts,
+
+        fileName: fileName,
+
+        fileData: fileData
+      };
+
+      const response = await fetch(
+        "/api/generate-paper",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json"
+          },
+
+          body: JSON.stringify(payload)
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Question paper generation failed."
+        );
+      }
+
+      if (
+        !Array.isArray(data.questions) ||
+        data.questions.length !== totalQuestions
+      ) {
+
+        throw new Error(
+          "AI returned an unexpected number of questions."
+        );
+      }
+
+      /*
+        Save information for existing ASTHIRA features.
+      */
+
+      window.lastQuestions = data.questions;
+
+      window.currentMeta = {
+
+        exam: exam,
+
+        subject: subject,
+
+        topic: chapter,
+
+        difficulty: difficulty,
+
+        language: language,
+
+        questionType: "Mixed Paper",
+
+        count: totalQuestions,
+
+        totalQuestions: totalQuestions,
+
+        totalMarks: totalMarks,
+
+        questionCounts: counts,
+
+        paperMode: true
+      };
+
+      /*
+        Render section-wise paper.
+      */
+
+      renderMixedPaper(data.questions);
+
+      /*
+        Update result information.
+      */
+
+      const resultMeta =
+        document.getElementById("resultMeta");
+
+      if (resultMeta) {
+
+        resultMeta.textContent =
+          `${totalQuestions} questions • ${totalMarks} marks • ${exam} • ${subject} • ${difficulty}`;
+      }
+
+      document.title =
+        `ASTHIRA AI - ${exam} - ${subject} - ${totalQuestions} Questions`;
+
+      if (typeof status === "function") {
+        status("Question paper generated successfully ✓");
+      }
+
+      const pdfHelp =
+        document.getElementById("pdf-help");
+
+      if (pdfHelp) {
+        pdfHelp.style.display = "block";
+      }
+
+    } catch (error) {
+
+      console.error(error);
+
+      if (typeof status === "function") {
+
+        status(
+          error.message || "Something went wrong.",
+          true
+        );
+
+      } else {
+
+        alert(
+          error.message || "Something went wrong."
+        );
+      }
+
+    } finally {
+
+      this.disabled = false;
+    }
+  };
+
+  console.log(
+    "ASTHIRA mixed question paper generator connected ✓"
+  );
+
+})();
+</script>
 </body>
 </html>
