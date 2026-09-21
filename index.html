@@ -1632,5 +1632,697 @@ render=function(qs){
 
 })();
 </script>
+  <script>
+/* =========================================================
+   ASTHIRA AI — ASSIGNMENTS 2.0 FRONTEND
+   ========================================================= */
+
+(function(){
+
+  function waitSB(){
+    return new Promise(function(resolve,reject){
+      let n=0;
+      function check(){
+        if(window.supabaseClient){
+          resolve(window.supabaseClient);
+          return;
+        }
+        if(++n>80){
+          reject(new Error("Supabase connection timeout"));
+          return;
+        }
+        setTimeout(check,250);
+      }
+      check();
+    });
+  }
+
+  function escA(v){
+    return String(v==null?"":v)
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;")
+      .replace(/'/g,"&#039;");
+  }
+
+  function content(){
+    return document.getElementById("dashboardContent");
+  }
+
+  async function session(){
+    const sb=await waitSB();
+    const r=await sb.auth.getSession();
+    return {
+      sb:sb,
+      user:r.data && r.data.session ? r.data.session.user : null
+    };
+  }
+
+  /* =======================================================
+     STUDENT — MY ASSIGNMENTS
+     ======================================================= */
+
+  async function showAssignmentsV2(){
+
+    try{
+
+      const x=await session();
+
+      if(!x.user){
+        alert("Please login first.");
+        return;
+      }
+
+      const r=await x.sb.rpc("ast_my_assignments_v2");
+
+      if(r.error){
+        content().innerHTML=
+          "<b>📝 My Assignments</b>"+
+          "<div class='bank-item'>"+
+          escA(r.error.message)+
+          "</div>";
+        return;
+      }
+
+      const rows=r.data||[];
+
+      let html=
+        "<b>📝 My Assignments</b>"+
+        "<div class='small' style='margin:6px 0 12px'>"+
+        "Complete the assignments given by ASTHIRA faculty."+
+        "</div>";
+
+      if(!rows.length){
+        html+="<div class='bank-item'>No assignments yet.</div>";
+        content().innerHTML=html;
+        return;
+      }
+
+      rows.forEach(function(a){
+
+        const completed=a.status==="completed";
+
+        const due=a.due_at
+          ? new Date(a.due_at).toLocaleString()
+          : "No due date";
+
+        let statusText=completed
+          ? "✅ Completed"
+          : "🟠 Pending";
+
+        html+=
+          "<div class='bank-item'>"+
+          "<b>"+escA(a.title)+"</b><br>"+
+          "<span class='small'>"+
+          escA(a.instructions||"")+
+          "<br>📚 "+escA(a.question_set_title||"Question Set")+
+          "<br>❓ "+(a.question_count||0)+" questions"+
+          "<br>📅 Due: "+escA(due)+
+          "<br>"+statusText+
+          "</span>";
+
+        if(completed){
+
+          html+=
+            "<br><br><b>🏆 Score: "+
+            (a.score||0)+"/"+
+            (a.total||0)+
+            " ("+
+            (a.percent||0)+
+            "%)</b>";
+
+        }else{
+
+          html+=
+            "<br><br>"+
+            "<button class='tool astStartAssignmentBtn' "+
+            "data-id='"+escA(a.id)+"'>"+
+            "▶️ Start Assignment"+
+            "</button>";
+
+        }
+
+        html+="</div>";
+      });
+
+      content().innerHTML=html;
+
+      document
+        .querySelectorAll(".astStartAssignmentBtn")
+        .forEach(function(btn){
+
+          btn.onclick=function(){
+            startAssignmentV2(btn.getAttribute("data-id"));
+          };
+
+        });
+
+    }catch(e){
+
+      content().innerHTML=
+        "<b>📝 My Assignments</b>"+
+        "<div class='bank-item'>"+
+        escA(e.message)+
+        "</div>";
+
+    }
+
+  }
+
+
+  /* =======================================================
+     START ASSIGNMENT
+     ======================================================= */
+
+  let activeAssignmentId=null;
+
+  async function startAssignmentV2(id){
+
+    try{
+
+      const x=await session();
+
+      if(!x.user){
+        alert("Please login first.");
+        return;
+      }
+
+      const r=await x.sb.rpc(
+        "ast_start_assignment_v2",
+        {
+          p_assignment_id:id
+        }
+      );
+
+      if(r.error){
+        alert("Assignment error: "+r.error.message);
+        return;
+      }
+
+      const a=r.data;
+
+      if(!a || !Array.isArray(a.questions)){
+        alert("Questions could not be loaded.");
+        return;
+      }
+
+      if(!a.questions.length){
+        alert("This assignment has no questions.");
+        return;
+      }
+
+      activeAssignmentId=id;
+
+      /* Use existing ASTHIRA online test engine */
+      currentMeta={
+        exam:"TNPSC",
+        subject:"Assignment",
+        topic:a.title||"Assignment",
+        difficulty:"",
+        language:"",
+        questionType:"MCQ"
+      };
+
+      startTest(a.questions);
+
+      document.getElementById("testInfo").textContent=
+        "📝 "+(a.title||"Assignment")+
+        " • "+a.questions.length+" questions";
+
+      window.scrollTo({
+        top:document.getElementById("testPanel").offsetTop-10,
+        behavior:"smooth"
+      });
+
+    }catch(e){
+
+      alert("Could not start assignment: "+e.message);
+
+    }
+
+  }
+
+
+  /* =======================================================
+     SAVE ASSIGNMENT RESULT
+     ======================================================= */
+
+  const oldSubmitTest=window.submitTest;
+
+  window.submitTest=async function(){
+
+    if(!activeAssignmentId){
+
+      oldSubmitTest();
+
+      return;
+    }
+
+    if(!testSet || !testSet.length){
+      return;
+    }
+
+    let correct=0;
+
+    testSet.forEach(function(q,i){
+
+      if(testAnswers[i]===q.answerLetter){
+        correct++;
+      }
+
+    });
+
+    const total=testSet.length;
+    const percent=Math.round(correct/total*100);
+
+    /* Existing local result */
+    oldSubmitTest();
+
+    try{
+
+      const x=await session();
+
+      if(x.user){
+
+        const answers={};
+
+        Object.keys(testAnswers||{}).forEach(function(k){
+          answers[k]=testAnswers[k];
+        });
+
+        const r=await x.sb.rpc(
+          "ast_submit_assignment_v2",
+          {
+            p_assignment_id:activeAssignmentId,
+            p_answers:answers,
+            p_score:correct,
+            p_total:total,
+            p_percent:percent
+          }
+        );
+
+        if(r.error){
+
+          alert(
+            "Test completed, but assignment result could not be saved: "+
+            r.error.message
+          );
+
+        }else{
+
+          activeAssignmentId=null;
+
+          setTimeout(function(){
+
+            alert(
+              "✅ Assignment completed successfully!\n\n"+
+              "Score: "+correct+"/"+total+
+              " ("+percent+"%)"
+            );
+
+          },100);
+
+        }
+
+      }
+
+    }catch(e){
+
+      console.error("Assignment submission:",e);
+
+    }
+
+  };
+
+
+  /* =======================================================
+     STAFF — CREATE ASSIGNMENT
+     ======================================================= */
+
+  async function showAssignmentManager(){
+
+    try{
+
+      const x=await session();
+
+      if(!x.user){
+        alert("Please login first.");
+        return;
+      }
+
+      const role=await x.sb
+        .from("profiles")
+        .select("role")
+        .eq("id",x.user.id)
+        .maybeSingle();
+
+      if(
+        !role.data ||
+        !["admin","teacher"].includes(role.data.role)
+      ){
+
+        alert("Admin/Teacher access only.");
+        return;
+
+      }
+
+      const students=await x.sb.rpc(
+        "ast_assignment_students_v2"
+      );
+
+      const sets=await x.sb.rpc(
+        "ast_assignment_question_sets_v2"
+      );
+
+      if(students.error){
+        alert("Student list error: "+students.error.message);
+        return;
+      }
+
+      if(sets.error){
+        alert("Question set error: "+sets.error.message);
+        return;
+      }
+
+      let studentOptions=
+        "<option value=''>All Students</option>";
+
+      (students.data||[]).forEach(function(s){
+
+        studentOptions+=
+          "<option value='"+escA(s.id)+"'>"+
+          escA(s.full_name||"Student")+
+          " — "+
+          escA(s.student_id||"")+
+          "</option>";
+
+      });
+
+
+      let setOptions=
+        "<option value=''>Select Question Set</option>";
+
+      (sets.data||[]).forEach(function(q){
+
+        setOptions+=
+          "<option value='"+escA(q.id)+"'>"+
+          escA(q.title||"Question Set")+
+          " • "+
+          (q.question_count||0)+
+          " Q"+
+          "</option>";
+
+      });
+
+
+      content().innerHTML=
+
+        "<b>👨‍🏫 Assignment Manager</b>"+
+
+        "<div class='bank-item'>"+
+
+        "<label>Assignment Title</label>"+
+        "<input id='astV2Title' "+
+        "placeholder='Example: Indian Polity Test 1'>"+
+
+        "<label>Instructions</label>"+
+        "<input id='astV2Instructions' "+
+        "placeholder='Complete all questions'>"+
+
+        "<label>Student</label>"+
+        "<select id='astV2Student'>"+
+        studentOptions+
+        "</select>"+
+
+        "<label>Question Set</label>"+
+        "<select id='astV2Set'>"+
+        setOptions+
+        "</select>"+
+
+        "<label>Due Date & Time</label>"+
+        "<input id='astV2Due' type='datetime-local'>"+
+
+        "<br><br>"+
+
+        "<button class='primary' id='astV2Create'>"+
+        "📝 Create Assignment"+
+        "</button>"+
+
+        "</div>"+
+
+        "<div class='bank-item'>"+
+        "<button class='tool' id='astV2Report'>"+
+        "📊 Assignment Report"+
+        "</button>"+
+        "</div>";
+
+
+      document.getElementById("astV2Create").onclick=
+        async function(){
+
+          const title=
+            document.getElementById("astV2Title")
+              .value.trim();
+
+          const instructions=
+            document.getElementById("astV2Instructions")
+              .value.trim();
+
+          const student=
+            document.getElementById("astV2Student")
+              .value;
+
+          const set=
+            document.getElementById("astV2Set")
+              .value;
+
+          const due=
+            document.getElementById("astV2Due")
+              .value;
+
+
+          if(!title){
+            alert("Enter assignment title.");
+            return;
+          }
+
+          if(!set){
+            alert("Select a question set.");
+            return;
+          }
+
+
+          const btn=this;
+
+          btn.disabled=true;
+          btn.textContent="Creating...";
+
+
+          const r=await x.sb.rpc(
+            "ast_create_assignment_v2",
+            {
+              p_title:title,
+              p_instructions:instructions,
+              p_assigned_to:student||null,
+              p_question_set_id:set,
+              p_due_at:due
+                ? new Date(due).toISOString()
+                : null
+            }
+          );
+
+
+          btn.disabled=false;
+          btn.textContent="📝 Create Assignment";
+
+
+          if(r.error){
+
+            alert(
+              "Assignment creation failed:\n"+
+              r.error.message
+            );
+
+            return;
+
+          }
+
+
+          alert(
+            "✅ Assignment created successfully!"
+          );
+
+          showAssignmentManager();
+
+        };
+
+
+      document.getElementById("astV2Report").onclick=
+        showAssignmentReport;
+
+
+    }catch(e){
+
+      alert("Assignment Manager error: "+e.message);
+
+    }
+
+  }
+
+
+  /* =======================================================
+     STAFF — REPORT
+     ======================================================= */
+
+  async function showAssignmentReport(){
+
+    try{
+
+      const x=await session();
+
+      const r=await x.sb.rpc(
+        "ast_staff_assignments_v2"
+      );
+
+      if(r.error){
+        alert("Report error: "+r.error.message);
+        return;
+      }
+
+      const rows=r.data||[];
+
+      let html=
+        "<b>📊 Assignment Report</b>";
+
+      if(!rows.length){
+
+        html+=
+          "<div class='bank-item'>"+
+          "No assignments created yet."+
+          "</div>";
+
+        content().innerHTML=html;
+        return;
+
+      }
+
+
+      const pending=
+        rows.filter(x=>x.status==="pending").length;
+
+      const completed=
+        rows.filter(x=>x.status==="completed").length;
+
+
+      html+=
+        "<div class='stat-grid'>"+
+        "<div class='stat'><b>"+rows.length+
+        "</b>Total</div>"+
+        "<div class='stat'><b>"+pending+
+        "</b>Pending</div>"+
+        "<div class='stat'><b>"+completed+
+        "</b>Completed</div>"+
+        "</div>";
+
+
+      rows.forEach(function(a){
+
+        const status=
+          a.status==="completed"
+          ? "✅ Completed"
+          : "🟠 Pending";
+
+        const due=a.due_at
+          ? new Date(a.due_at).toLocaleString()
+          : "No due date";
+
+        html+=
+          "<div class='bank-item'>"+
+          "<b>"+escA(a.title)+"</b><br>"+
+          "<span class='small'>"+
+          "👤 "+escA(a.student_name)+
+          " ("+escA(a.student_id)+")"+
+          "<br>📚 "+escA(a.question_set_title)+
+          "<br>📅 Due: "+escA(due)+
+          "<br>"+status+
+          "</span>";
+
+        if(a.status==="completed"){
+
+          html+=
+            "<br><b>🏆 "+
+            (a.score||0)+"/"+
+            (a.total||0)+
+            " ("+
+            (a.percent||0)+
+            "%)</b>";
+
+        }
+
+        html+="</div>";
+
+      });
+
+
+      content().innerHTML=html;
+
+    }catch(e){
+
+      alert("Report error: "+e.message);
+
+    }
+
+  }
+
+
+  /* =======================================================
+     CONNECT TO EXISTING ASTHIRA BUTTONS
+     ======================================================= */
+
+  function install(){
+
+    const assign=
+      document.getElementById("ast20AssignBtn");
+
+    if(assign){
+
+      assign.textContent="📝 My Assignments";
+      assign.onclick=showAssignmentsV2;
+
+    }
+
+
+    const staff=
+      document.getElementById("ast20StaffBtn");
+
+    if(staff){
+
+      staff.onclick=showAssignmentManager;
+
+    }
+
+  }
+
+
+  /* Wait for existing ASTHIRA dashboard */
+
+  let tries=0;
+
+  const timer=setInterval(function(){
+
+    install();
+
+    tries++;
+
+    if(tries>40){
+      clearInterval(timer);
+    }
+
+  },500);
+
+
+})();
+</script>
 </body>
 </html>
