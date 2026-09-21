@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://asthira-ai-tnpsc.vercel.app/sitemap.xml
