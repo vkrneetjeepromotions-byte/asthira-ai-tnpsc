@@ -3637,6 +3637,21 @@ render=function(qs){
     });
 
     container.innerHTML = html;
+    const answerKey = document.getElementById("answerKey");
+
+if (answerKey) {
+  answerKey.innerHTML =
+    "<h2>Answer Key</h2>" +
+    questions.map(function(q, i) {
+      return `
+        <div class="q">
+          <b>${i + 1}.</b>
+          <b>${escapeHTML(q.answerLetter || "")}</b>
+          — ${escapeHTML(q.answer || "")}
+        </div>
+      `;
+    }).join("");
+}
 
     const results = document.getElementById("results");
 
