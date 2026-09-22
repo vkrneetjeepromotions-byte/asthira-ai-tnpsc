@@ -569,15 +569,37 @@ render=function(qs){
                type="text"
                placeholder="Example: ASTHIRA001">
 
-        <label>Email</label>
-        <input id="authEmail"
-               type="email"
-               placeholder="Enter email address">
+       <label>Email</label>
+<input id="authEmail"
+       type="email"
+       placeholder="Enter email address">
 
-        <label>Password</label>
-        <input id="authPassword"
-               type="password"
-               placeholder="Minimum 6 characters">
+<label>Phone Number</label>
+<input id="authPhone"
+       type="tel"
+       maxlength="10"
+       placeholder="Enter 10-digit phone number">
+
+<label>Target Exam</label>
+<select id="authTargetExam">
+  <option value="TNPSC Group 1">TNPSC Group 1</option>
+  <option value="TNPSC Group 2">TNPSC Group 2</option>
+  <option value="TNPSC Group 2A">TNPSC Group 2A</option>
+  <option value="TNPSC Group 4">TNPSC Group 4</option>
+  <option value="TNUSRB SI">TNUSRB SI</option>
+  <option value="TNUSRB Constable">TNUSRB Constable</option>
+  <option value="Other">Other</option>
+</select>
+
+<label>Batch</label>
+<input id="authBatch"
+       type="text"
+       placeholder="Example: Morning Batch">
+
+<label>Password</label>
+<input id="authPassword"
+       type="password"
+       placeholder="Minimum 6 characters">
 
         <div class="toolbar">
 
