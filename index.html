@@ -1764,7 +1764,79 @@ if(!/^[6-9]\d{9}$/.test(phone)){
       else alert("Assignment created successfully.");
     };
   }
+document.getElementById("astStudentDatabase").onclick = async function(){
 
+  if(!x.user){
+    alert("Please login first.");
+    return;
+  }
+
+  const roleCheck = await x.sb
+    .from("profiles")
+    .select("role")
+    .eq("id", x.user.id)
+    .maybeSingle();
+
+  if(!roleCheck.data || roleCheck.data.role !== "admin"){
+    alert("Admin access only.");
+    return;
+  }
+
+  const r = await x.sb
+    .from("ast_student_registry")
+    .select("full_name,student_id,phone,email,target_exam,batch,status,joined_at")
+    .order("joined_at",{ascending:false});
+
+  if(r.error){
+    contentEl().innerHTML =
+      "<b>👥 Student Database</b>" +
+      "<div class='bank-item'>" +
+      esc(r.error.message) +
+      "</div>";
+    return;
+  }
+
+  const rows = r.data || [];
+
+  let html =
+    "<b>👥 ASTHIRA Student Database</b>" +
+    "<div class='small' style='margin:6px 0 12px'>" +
+    "Admin access only • " + rows.length + " students" +
+    "</div>";
+
+  if(!rows.length){
+
+    html +=
+      "<div class='bank-item'>No students registered yet.</div>";
+
+  }else{
+
+    rows.forEach(function(s){
+
+      html +=
+        "<div class='bank-item'>" +
+        "<b>👤 " + esc(s.full_name || "Student") + "</b><br>" +
+        "Student ID: " + esc(s.student_id || "") + "<br>" +
+        "📱 Phone: " + esc(s.phone || "") + "<br>" +
+        "✉️ Email: " + esc(s.email || "") + "<br>" +
+        "🎯 Exam: " + esc(s.target_exam || "") + "<br>" +
+        "🏫 Batch: " + esc(s.batch || "") + "<br>" +
+        "Status: " + esc(s.status || "") + "<br>" +
+        "Joined: " +
+        esc(
+          s.joined_at
+            ? new Date(s.joined_at).toLocaleDateString()
+            : ""
+        ) +
+        "</div>";
+
+    });
+
+  }
+
+  contentEl().innerHTML = html;
+
+};
   /* Add the new tools after existing dashboard is available. */
   function install(){
     ensureButtons();
