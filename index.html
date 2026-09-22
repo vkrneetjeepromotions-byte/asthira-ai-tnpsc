@@ -740,17 +740,33 @@ render=function(qs){
 
       const email=
         document.getElementById("authEmail").value.trim();
+      const phone=
+  document.getElementById("authPhone").value.trim();
+
+const targetExam=
+  document.getElementById("authTargetExam").value;
+
+const batch=
+  document.getElementById("authBatch").value.trim();
 
       const password=
         document.getElementById("authPassword").value;
 
-      if(!fullName || !studentId || !email){
-        message(
-          "Please enter Full Name, Student ID and Email.",
-          true
-        );
-        return;
-      }
+      if(!fullName || !studentId || !email || !phone){
+  message(
+    "Please enter Full Name, Student ID, Email and Phone Number.",
+    true
+  );
+  return;
+}
+
+if(!/^[6-9]\d{9}$/.test(phone)){
+  message(
+    "Please enter a valid 10-digit Indian mobile number.",
+    true
+  );
+  return;
+}
 
       if(password.length<6){
         message(
@@ -774,12 +790,15 @@ render=function(qs){
       const {data,error}=await supabase.auth.signUp({
         email:email,
         password:password,
-        options:{
-          data:{
-            full_name:fullName,
-            student_id:studentId
-          }
-        }
+       options:{
+  data:{
+    full_name:fullName,
+    student_id:studentId,
+    phone:phone,
+    target_exam:targetExam,
+    batch:batch
+  }
+}
       });
 
       this.disabled=false;
