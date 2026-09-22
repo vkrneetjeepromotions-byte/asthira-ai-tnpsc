@@ -3642,22 +3642,24 @@ render=function(qs){
     });
 
     container.innerHTML = html;
-    const answerKey = document.getElementById("answerKey");
+   const answerKey = document.getElementById("answerKey");
 
 if (answerKey) {
   answerKey.innerHTML =
-    "<h2>Answer Key</h2>" +
+    "<h2>Answer Key & Explanation</h2>" +
     questions.map(function(q, i) {
       return `
         <div class="q">
-          <b>${i + 1}.</b>
-          <b>${escapeHTML(q.answerLetter || "")}</b>
+          <b>${i + 1}. ${escapeHTML(q.answerLetter || "")}</b>
           — ${escapeHTML(q.answer || "")}
+          <div class="exp">
+            <b>Explanation:</b>
+            ${escapeHTML(q.explanation || "")}
+          </div>
         </div>
       `;
     }).join("");
 }
-
     const results = document.getElementById("results");
 
     if (results) {
