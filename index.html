@@ -339,9 +339,14 @@ function render(qs){
     </article>`;
   }).join("");
 
-  $("answerKey").innerHTML="<h2>Answer Key</h2>"+lastQuestions.map((q,i)=>
-    `<div class="q"><b>${i+1}.</b> <b>${esc(q.answerLetter||"")}</b> — ${esc(q.answer)}</div>`
-  ).join("");
+ $("answerKey").innerHTML =
+  "<h2>Answer Key & Explanation</h2>" +
+  lastQuestions.map((q,i)=>
+    `<div class="q">
+      <b>${i+1}. ${esc(q.answerLetter || "")}</b> — ${esc(q.answer || "")}
+      <div class="exp"><b>Explanation:</b> ${esc(q.explanation || "")}</div>
+    </div>`
+  ).join(""); 
 
   $("results").style.display="block";
   window.scrollTo({top:$("results").offsetTop-10,behavior:"smooth"});
