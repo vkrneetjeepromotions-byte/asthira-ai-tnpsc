@@ -749,7 +749,20 @@ render=function(qs){
 
 const targetExam=
   document.getElementById("authTargetExam").value;
+      
+const premiumExams = ["CBSE","NEET","JEE","Sainik School"];
 
+const planName = premiumExams.includes(targetExam)
+  ? "ASTHIRA Premium"
+  : "ASTHIRA Competitive";
+
+const planAmount = premiumExams.includes(targetExam)
+  ? 500
+  : 20;
+
+const planDays = premiumExams.includes(targetExam)
+  ? 30
+  : 6;
 const batch=
   document.getElementById("authBatch").value.trim();
 
@@ -795,13 +808,16 @@ if(!/^[6-9]\d{9}$/.test(phone)){
         email:email,
         password:password,
        options:{
-  data:{
-    full_name:fullName,
-    student_id:studentId,
-    phone:phone,
-    target_exam:targetExam,
-    batch:batch
-  }
+ data:{
+  full_name:fullName,
+  student_id:studentId,
+  phone:phone,
+  target_exam:targetExam,
+  batch:batch,
+  plan_name:planName,
+  plan_amount:planAmount,
+  plan_days:planDays
+}
 }
       });
 
