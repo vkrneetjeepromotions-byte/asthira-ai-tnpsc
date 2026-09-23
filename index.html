@@ -594,7 +594,10 @@ render=function(qs){
   <option value="Sainik School">Sainik School</option>
   <option value="Other">Other Competitive Exam</option>
 </select>
-
+<div id="authPlanInfo"
+     style="margin:10px 0;padding:10px;border-radius:8px;text-align:center;font-weight:bold;">
+  Select your target exam to see the access plan.
+</div>
 <label>Batch</label>
 <input id="authBatch"
        type="text"
@@ -650,7 +653,48 @@ render=function(qs){
     const msg=document.getElementById("authMessage");
     const form=document.getElementById("authForm");
     const userBox=document.getElementById("authUser");
+const authTargetExamEl =
+  document.getElementById("authTargetExam");
 
+const authPlanInfoEl =
+  document.getElementById("authPlanInfo");
+
+function updateAuthPlanInfo(){
+
+  if(!authTargetExamEl || !authPlanInfoEl) return;
+
+  const premiumExams = [
+    "CBSE",
+    "NEET",
+    "JEE",
+    "Sainik School"
+  ];
+
+  const exam = authTargetExamEl.value;
+
+  if(premiumExams.includes(exam)){
+
+    authPlanInfoEl.textContent =
+      "💳 ₹500 — 30 Days Access";
+
+  }else{
+
+    authPlanInfoEl.textContent =
+      "💳 ₹20 — 6 Days Access";
+
+  }
+}
+
+if(authTargetExamEl){
+
+  authTargetExamEl.addEventListener(
+    "change",
+    updateAuthPlanInfo
+  );
+
+  updateAuthPlanInfo();
+
+}
     function message(text,error=false){
       msg.textContent=text;
       msg.style.display="block";
