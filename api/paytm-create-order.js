@@ -58,7 +58,8 @@ export default async function handler(req, res) {
       mid: mid,
       websiteName: website,
       orderId: orderId,
-
+callbackUrl:
+  `https://securestage.paytmpayments.com/theia/paytmCallback?ORDER_ID=${orderId}`,
      
       txnAmount: {
         value: amount,
