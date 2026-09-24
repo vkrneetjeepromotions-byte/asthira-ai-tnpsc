@@ -127,7 +127,7 @@ export default async function handler(req, res) {
     console.error("Paytm create order error:", error);
 
     return res.status(500).json({
-      error: "Internal server error while creating Paytm transaction.",
+      error: error.message || "Internal server error while creating Paytm transaction.",
     });
   }
 }
