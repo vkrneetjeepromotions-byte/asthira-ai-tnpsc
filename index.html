@@ -618,7 +618,7 @@ render=function(qs){
           <button class="primary"
                   id="signupBtn"
                   type="button">
-            Create Student Account
+            Pay Now
           </button>
 
           <button class="tool"
@@ -852,7 +852,148 @@ if(!/^[6-9]\d{9}$/.test(phone)){
         this.textContent="Create Student Account";
         return;
       }
+// ---------- PAYTM PAYMENT ----------
+const paymentResponse = await fetch("/api/paytm-create-order", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    targetExam,
+    fullName,
+    email,
+    phone,
+    studentId
+  })
+});
 
+const paymentData = await paymentResponse.json();
+
+if (!paymentResponse.ok || !paymentData.success) {
+  message(
+    paymentData.error || "Unable to start Paytm payment.",
+    true
+  );
+  return;
+}
+
+const paymentVerified = await new Promise((resolve) => {
+
+  let finished = false;
+
+  const finishPayment = async () => {
+    if (finished) return;
+
+    try {
+      const verifyResponse = await fetch(
+        "/api/paytm-verify-payment",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            orderId: paymentData.orderId,
+            expectedAmount: paymentData.amount
+          })
+        }
+      );
+
+      const verifyData = await verifyResponse.json();
+
+      if (verifyData.success) {
+        finished = true;
+        resolve(true);
+      }
+    } catch (error) {
+      console.error("Payment verification error:", error);
+    }
+  };
+
+  const config = {
+    root: "",
+    flow: "DEFAULT",
+    data: {
+      orderId: paymentData.orderId,
+      token: paymentData.txnToken,
+      tokenType: "TXN_TOKEN",
+      amount: paymentData.amount
+    },
+    merchant: {
+      mid: paymentData.mid,
+      redirect: false
+    },
+    handler: {
+      transactionStatus: function(data) {
+        console.log("Paytm transaction status:", data);
+        finishPayment();
+      },
+
+      notifyMerchant: function(eventName, data) {
+        console.log(
+          "Paytm event:",
+          eventName,
+          data
+        );
+
+        if (eventName === "APP_CLOSED") {
+          setTimeout(finishPayment, 1000);
+        }
+      }
+    }
+  };
+
+  if (
+    !window.Paytm ||
+    !window.Paytm.CheckoutJS
+  ) {
+    alert("Paytm Checkout could not be loaded.");
+    resolve(false);
+    return;
+  }
+
+  window.Paytm.CheckoutJS.onLoad(function() {
+
+    window.Paytm.CheckoutJS
+      .init(config)
+      .then(function() {
+        window.Paytm.CheckoutJS.invoke();
+      })
+      .catch(function(error) {
+        console.error(
+          "Paytm Checkout error:",
+          error
+        );
+        resolve(false);
+      });
+
+  });
+
+  // Safety check after 60 seconds
+  setTimeout(() => {
+    if (!finished) {
+      finished = true;
+      resolve(false);
+    }
+  }, 60000);
+});
+
+if (!paymentVerified) {
+  message(
+    "Payment was not completed or could not be verified.",
+    true
+  );
+  return;
+}
+
+message(
+  "Payment successful. Creating your student account...",
+  false
+);
+
+// ---------- PAYMENT SUCCESS ----------
+
+// Existing Supabase signup continues below
       const {data,error}=await supabase.auth.signUp({
         email:email,
         password:password,
