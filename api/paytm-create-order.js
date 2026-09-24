@@ -59,9 +59,7 @@ export default async function handler(req, res) {
       websiteName: website,
       orderId: orderId,
 
-      callbackUrl:
-        "https://asthira-ai-tnpsc.vercel.app/api/paytm-callback",
-
+     
       txnAmount: {
         value: amount,
         currency: "INR",
