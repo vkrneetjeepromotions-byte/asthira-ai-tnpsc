@@ -76,8 +76,9 @@ export default async function handler(req, res) {
     const paytmRequest = {
       body,
       head: {
-        signature,
-      },
+  channelId: "WEB",
+  signature,
+},
     };
 
     const paytmUrl =
