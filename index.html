@@ -87,6 +87,7 @@ body.answer-only-print .answerKey{display:block!important}
   src="https://securegw-stage.paytm.in/merchantpgpui/checkoutjs/merchants/cbnIqA0853491725085.js"
   crossorigin="anonymous">
 </script>
+  <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
 </head>
 <body>
 <header>
@@ -852,8 +853,9 @@ if(!/^[6-9]\d{9}$/.test(phone)){
         this.textContent="Create Student Account";
         return;
       }
-// ---------- PAYTM PAYMENT ----------
-const paymentResponse = await fetch("/api/paytm-create-order", {
+// ---------- CASHFREE PAYMENT ----------
+
+const paymentResponse = await fetch("/api/cashfree-create-order", {
   method: "POST",
   headers: {
     "Content-Type": "application/json"
@@ -871,118 +873,95 @@ const paymentData = await paymentResponse.json();
 
 if (!paymentResponse.ok || !paymentData.success) {
   message(
-    paymentData.error || "Unable to start Paytm payment.",
+    paymentData.error || "Unable to start Cashfree payment.",
     true
   );
   return;
 }
 
-const paymentVerified = await new Promise((resolve) => {
+if (
+  !window.Cashfree
+) {
+  message(
+    "Cashfree Checkout could not be loaded.",
+    true
+  );
+  return;
+}
 
-  let finished = false;
+const cashfree = Cashfree({
+  mode: "sandbox"
+});
 
-  const finishPayment = async () => {
-    if (finished) return;
+let paymentVerified = false;
 
-    try {
-      const verifyResponse = await fetch(
-        "/api/paytm-verify-payment",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            orderId: paymentData.orderId,
-            expectedAmount: paymentData.amount
-          })
-        }
-      );
-
-      const verifyData = await verifyResponse.json();
-
-      if (verifyData.success) {
-        finished = true;
-        resolve(true);
+const verifyCashfreePayment = async function () {
+  try {
+    const verifyResponse = await fetch(
+      "/api/cashfree-verify-payment",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          orderId: paymentData.orderId,
+          expectedAmount: paymentData.amount
+        })
       }
-    } catch (error) {
-      console.error("Payment verification error:", error);
+    );
+
+    const verifyData = await verifyResponse.json();
+
+    if (verifyData.success) {
+      paymentVerified = true;
     }
-  };
+  } catch (error) {
+    console.error(
+      "Cashfree payment verification error:",
+      error
+    );
+  }
 
-  const config = {
-    root: "",
-    flow: "DEFAULT",
-    data: {
-      orderId: paymentData.orderId,
-      token: paymentData.txnToken,
-      tokenType: "TXN_TOKEN",
-      amount: paymentData.amount
-    },
-    merchant: {
-      mid: paymentData.mid,
-      redirect: false
-    },
-    handler: {
-      transactionStatus: function(data) {
-        console.log("Paytm transaction status:", data);
-        finishPayment();
-      },
-
-      notifyMerchant: function(eventName, data) {
-        console.log(
-          "Paytm event:",
-          eventName,
-          data
-        );
-
-        if (eventName === "APP_CLOSED") {
-          setTimeout(finishPayment, 1000);
-        }
-      }
-    }
-  };
-
-  if (
-    !window.Paytm ||
-    !window.Paytm.CheckoutJS
-  ) {
-    alert("Paytm Checkout could not be loaded.");
-    resolve(false);
+  if (!paymentVerified) {
+    message(
+      "Payment was not completed or could not be verified.",
+      true
+    );
     return;
   }
 
-  window.Paytm.CheckoutJS.onLoad(function() {
+  message(
+    "Payment successful. Creating your student account...",
+    false
+  );
 
-    window.Paytm.CheckoutJS
-      .init(config)
-      .then(function() {
-        window.Paytm.CheckoutJS.invoke();
-      })
-      .catch(function(error) {
-        console.error(
-          "Paytm Checkout error:",
-          error
-        );
-        resolve(false);
-      });
+  // ---------- PAYMENT SUCCESS ----------
+  // Existing Supabase signup continues below.
+};
 
+try {
+  await cashfree.checkout({
+    paymentSessionId: paymentData.paymentSessionId,
+    redirectTarget: "_modal"
   });
 
-  // Safety check after 60 seconds
-  setTimeout(() => {
-    if (!finished) {
-      finished = true;
-      resolve(false);
-    }
-  }, 60000);
-});
+  await verifyCashfreePayment();
+} catch (error) {
+  console.error(
+    "Cashfree Checkout error:",
+    error
+  );
 
-if (!paymentVerified) {
   message(
-    "Payment was not completed or could not be verified.",
+    "Cashfree payment was cancelled or could not be completed.",
     true
   );
+
+  return;
+}
+
+if (!paymentVerified) {
   return;
 }
 
