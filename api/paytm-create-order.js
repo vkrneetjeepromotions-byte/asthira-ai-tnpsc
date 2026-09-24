@@ -110,8 +110,9 @@ export default async function handler(req, res) {
     ) {
       return res.status(400).json({
         error:
-          result.body?.resultInfo?.resultMsg ||
-          "Unable to create Paytm transaction.",
+  `Paytm ${result.body?.resultInfo?.resultCode || "UNKNOWN"}: ${
+    result.body?.resultInfo?.resultMsg || "Unable to create Paytm transaction."
+  }`,
         details: result,
       });
     }
