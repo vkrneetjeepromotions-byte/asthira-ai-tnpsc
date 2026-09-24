@@ -8,9 +8,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const mid = process.env.PAYTM_MID;
-    const merchantKey = process.env.PAYTM_MERCHANT_KEY;
-    const website = process.env.PAYTM_WEBSITE || "WEBSTAGING";
+    const mid = (process.env.PAYTM_MID || "").trim();
+    const merchantKey = (process.env.PAYTM_MERCHANT_KEY || "").trim();
+    const website = (process.env.PAYTM_WEBSITE || "WEBSTAGING").trim();
 
     if (!mid || !merchantKey) {
       return res.status(500).json({
@@ -48,41 +48,49 @@ export default async function handler(req, res) {
       "ASTHIRA_" +
       Date.now() +
       "_" +
-      Math.random().toString(36).substring(2, 8).toUpperCase();
+      Math.random()
+        .toString(36)
+        .substring(2, 8)
+        .toUpperCase();
 
     const body = {
       requestType: "Payment",
-      mid,
+      mid: mid,
       websiteName: website,
-      
-      orderId,
+      orderId: orderId,
+
+      callbackUrl:
+        "https://asthira-ai-tnpsc.vercel.app/api/paytm-callback",
+
       txnAmount: {
         value: amount,
         currency: "INR",
       },
+
       userInfo: {
         custId: studentId,
         mobile: phone,
-        email,
+        email: email,
         firstName: fullName,
       },
     };
 
+    const bodyString = JSON.stringify(body);
+
     const signature = await PaytmChecksum.generateSignature(
-      JSON.stringify(body),
+      bodyString,
       merchantKey
     );
 
     const paytmRequest = {
-      body,
+      body: body,
       head: {
-  
-  signature,
-},
+        signature: signature,
+      },
     };
 
     const paytmUrl =
-      `https://securestage.paytmpayments.com/theia/api/v1/initiateTransaction` +
+      "https://securestage.paytmpayments.com/theia/api/v1/initiateTransaction" +
       `?mid=${encodeURIComponent(mid)}` +
       `&orderId=${encodeURIComponent(orderId)}`;
 
@@ -110,27 +118,32 @@ export default async function handler(req, res) {
     ) {
       return res.status(400).json({
         error:
-  `Paytm ${result.body?.resultInfo?.resultCode || "UNKNOWN"}: ${
-    result.body?.resultInfo?.resultMsg || "Unable to create Paytm transaction."
-  }`,
+          `Paytm ${
+            result.body?.resultInfo?.resultCode || "UNKNOWN"
+          }: ${
+            result.body?.resultInfo?.resultMsg ||
+            "Unable to create Paytm transaction."
+          }`,
         details: result,
       });
     }
 
     return res.status(200).json({
       success: true,
-      orderId,
-      amount,
-      planDays,
+      orderId: orderId,
+      amount: amount,
+      planDays: planDays,
       txnToken: result.body.txnToken,
-      mid,
-      website,
+      mid: mid,
+      website: website,
     });
   } catch (error) {
     console.error("Paytm create order error:", error);
 
     return res.status(500).json({
-      error: error.message || "Internal server error while creating Paytm transaction.",
+      error:
+        error.message ||
+        "Internal server error while creating Paytm transaction.",
     });
   }
 }
