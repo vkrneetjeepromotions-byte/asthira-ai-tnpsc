@@ -82,11 +82,12 @@ callbackUrl:
     );
 
     const paytmRequest = {
-      body: body,
-      head: {
-        signature: signature,
-      },
-    };
+  body: body,
+  head: {
+    channelId: "WEB",
+    signature: signature,
+  },
+};
 
     const paytmUrl =
       "https://securestage.paytmpayments.com/theia/api/v1/initiateTransaction" +
