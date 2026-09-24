@@ -54,6 +54,7 @@ export default async function handler(req, res) {
       requestType: "Payment",
       mid,
       websiteName: website,
+      channelId: "WEB",
       orderId,
       txnAmount: {
         value: amount,
