@@ -36,7 +36,7 @@ export default async function handler(req, res) {
     );
 
     const response = await fetch(
-      "https://securegw-stage.paytm.in/v3/order/status",
+      "https://securestage.paytmpayments.com/merchant-status/api/v1/getPaymentStatus?mid=${encodeURIComponent(mid)}&orderId=${encodeURIComponent(orderId)}",
       {
         method: "POST",
         headers: {
