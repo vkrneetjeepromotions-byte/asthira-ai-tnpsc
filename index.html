@@ -563,29 +563,25 @@ render=function(qs){
            style="display:none;margin-bottom:12px"></div>
 
       <div id="authForm">
+        <div class="toolbar" role="tablist" aria-label="Student account options" style="margin-bottom:14px">
+          <button class="primary" id="signupModeBtn" type="button" role="tab" aria-selected="true">New student signup</button>
+          <button class="tool" id="loginModeBtn" type="button" role="tab" aria-selected="false">Existing student login</button>
+        </div>
 
-        <label>Full Name</label>
-        <input id="authName"
-               type="text"
-               placeholder="Enter your full name">
+        <label for="authEmail">Email</label>
+        <input id="authEmail" type="email" autocomplete="email" placeholder="Enter email address">
 
-        <label>Student ID</label>
-        <input id="authStudentId"
-               type="text"
-               placeholder="Example: ASTHIRA001">
+        <div id="signupFields">
+        <label for="authName">Full Name</label>
+        <input id="authName" type="text" autocomplete="name" placeholder="Enter your full name">
 
-       <label>Email</label>
-<input id="authEmail"
-       type="email"
-       placeholder="Enter email address">
+        <label for="authStudentId">Student ID</label>
+        <input id="authStudentId" type="text" placeholder="Example: ASTHIRA001">
 
-<label>Phone Number</label>
-<input id="authPhone"
-       type="tel"
-       maxlength="10"
-       placeholder="Enter 10-digit phone number">
+<label for="authPhone">Phone Number</label>
+<input id="authPhone" type="tel" maxlength="10" autocomplete="tel" placeholder="Enter 10-digit phone number">
 
-<label>Target Exam</label>
+<label for="authTargetExam">Target Exam</label>
 <select id="authTargetExam">
   <option value="TNPSC Group 1">TNPSC Group 1</option>
   <option value="TNPSC Group 2">TNPSC Group 2</option>
@@ -614,11 +610,13 @@ render=function(qs){
 <input id="authBatch"
        type="text"
        placeholder="Example: year">
+        </div>
 
-<label>Password (for existing student login)</label>
-<input id="authPassword"
-       type="password"
-       placeholder="Enter your password to log in">
+        <div id="loginFields" style="display:none">
+          <label for="authPassword">Password</label>
+          <input id="authPassword" type="password" autocomplete="current-password" placeholder="Enter your password">
+          <button class="tool" id="resetPasswordBtn" type="button" style="margin-top:8px">Forgot password?</button>
+        </div>
 
         <div class="toolbar">
 
@@ -636,7 +634,7 @@ render=function(qs){
 
         </div>
 
-        <div class="small">
+        <div class="small" id="signupHelp">
           New student: submit your payment reference for review. After approval,
           we’ll email you a secure link to set your password and activate your account.
         </div>
@@ -674,6 +672,29 @@ const paymentRequestPanel =
   document.getElementById("paymentRequestPanel");
 const signupButton =
   document.getElementById("signupBtn");
+const loginButton = document.getElementById("loginBtn");
+const signupFields = document.getElementById("signupFields");
+const loginFields = document.getElementById("loginFields");
+const signupHelp = document.getElementById("signupHelp");
+
+function setAuthMode(mode){
+  const isLogin = mode === "login";
+  signupFields.style.display = isLogin ? "none" : "block";
+  loginFields.style.display = isLogin ? "block" : "none";
+  paymentRequestPanel.style.display = "none";
+  signupHelp.style.display = isLogin ? "none" : "block";
+  signupButton.style.display = isLogin ? "none" : "";
+  loginButton.style.display = isLogin ? "" : "none";
+  document.getElementById("signupModeBtn").className = isLogin ? "tool" : "primary";
+  document.getElementById("loginModeBtn").className = isLogin ? "primary" : "tool";
+  document.getElementById("signupModeBtn").setAttribute("aria-selected", String(!isLogin));
+  document.getElementById("loginModeBtn").setAttribute("aria-selected", String(isLogin));
+  msg.style.display = "none";
+}
+
+document.getElementById("signupModeBtn").onclick = function(){setAuthMode("signup");};
+document.getElementById("loginModeBtn").onclick = function(){setAuthMode("login");};
+setAuthMode("signup");
 
 function updateAuthPlanInfo(){
 
@@ -919,8 +940,26 @@ if(!/^[6-9]\d{9}$/.test(phone)){
       }
 
       if(data.user){
-        await updateProfile(data.user);
         await showProfile(data.user);
+      }
+    };
+
+    document.getElementById("resetPasswordBtn").onclick=async function(){
+      const email=document.getElementById("authEmail").value.trim();
+      if(!email){message("Enter your email address first, then choose Forgot password?",true);return;}
+      const supabase=await getSupabase();
+      if(!supabase) return;
+      this.disabled=true;
+      try{
+        const {error}=await supabase.auth.resetPasswordForEmail(email,{
+          redirectTo:window.location.origin
+        });
+        if(error) throw error;
+        message("If an account exists for that email, Supabase will send a password reset link.");
+      }catch(error){
+        message(error.message||"Unable to send a password reset email.",true);
+      }finally{
+        this.disabled=false;
       }
     };
 
