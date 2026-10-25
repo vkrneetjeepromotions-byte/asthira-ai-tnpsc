@@ -87,7 +87,6 @@ body.answer-only-print .answerKey{display:block!important}
   src="https://securegw-stage.paytm.in/merchantpgpui/checkoutjs/merchants/cbnIqA0853491725085.js"
   crossorigin="anonymous">
 </script>
-  <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
 </head>
 <body>
 <header>
@@ -604,22 +603,29 @@ render=function(qs){
      style="margin:10px 0;padding:10px;border-radius:8px;text-align:center;font-weight:bold;">
   Select your target exam to see the access plan.
 </div>
+<div id="paymentRequestPanel" class="bank-item" style="display:none;text-align:center">
+  <b>Pay with Google Pay</b>
+  <p class="small">Scan this QR code and pay the amount shown above.</p>
+  <img src="GooglePay_QR.png" alt="ASTHIRA Google Pay payment QR code" style="width:min(280px,100%);height:auto;border:1px solid #d8ddea;border-radius:10px;background:#fff;padding:8px">
+  <label for="authUtr">UTR / payment reference number</label>
+  <input id="authUtr" type="text" maxlength="32" autocomplete="off" placeholder="Enter the reference shown in Google Pay">
+</div>
 <label>Batch</label>
 <input id="authBatch"
        type="text"
        placeholder="Example: year">
 
-<label>Password</label>
+<label>Password (for existing student login)</label>
 <input id="authPassword"
        type="password"
-       placeholder="Minimum 6 characters">
+       placeholder="Enter your password to log in">
 
         <div class="toolbar">
 
           <button class="primary"
                   id="signupBtn"
                   type="button">
-            Pay Now
+            Show payment QR
           </button>
 
           <button class="tool"
@@ -631,8 +637,8 @@ render=function(qs){
         </div>
 
         <div class="small">
-          New student: enter Full Name, Student ID, Email and Password,
-          then tap Create Student Account.
+          New student: submit your payment reference for review. After approval,
+          we’ll email you a secure link to set your password and activate your account.
         </div>
 
       </div>
@@ -664,6 +670,10 @@ const authTargetExamEl =
 
 const authPlanInfoEl =
   document.getElementById("authPlanInfo");
+const paymentRequestPanel =
+  document.getElementById("paymentRequestPanel");
+const signupButton =
+  document.getElementById("signupBtn");
 
 function updateAuthPlanInfo(){
 
@@ -695,7 +705,12 @@ if(authTargetExamEl){
 
   authTargetExamEl.addEventListener(
     "change",
-    updateAuthPlanInfo
+    function(){
+      updateAuthPlanInfo();
+      paymentRequestPanel.style.display="none";
+      document.getElementById("authUtr").value="";
+      signupButton.textContent="Show payment QR";
+    }
   );
 
   updateAuthPlanInfo();
@@ -816,9 +831,6 @@ const planDays = premiumExams.includes(targetExam)
 const batch=
   document.getElementById("authBatch").value.trim();
 
-      const password=
-        document.getElementById("authPassword").value;
-
       if(!fullName || !studentId || !email || !phone){
   message(
     "Please enter Full Name, Student ID, Email and Phone Number.",
@@ -835,203 +847,33 @@ if(!/^[6-9]\d{9}$/.test(phone)){
   return;
 }
 
-      if(password.length<6){
-        message(
-          "Password must contain at least 6 characters.",
-          true
-        );
+      if(paymentRequestPanel.style.display==="none"){
+        paymentRequestPanel.style.display="block";
+        this.textContent="Submit payment request";
+        message("Scan the QR code, pay the plan amount, then enter your UTR/reference number.");
         return;
       }
 
+      const utrNumber=document.getElementById("authUtr").value.trim();
+      if(!utrNumber){message("Enter your UTR/reference number after making the payment.",true);return;}
       this.disabled=true;
-      this.textContent="Creating...";
-
-      const supabase=await getSupabase();
-
-      if(!supabase){
-        this.disabled=false;
-        this.textContent="Create Student Account";
-        return;
-      }
-// ---------- CASHFREE PAYMENT ----------
-
-const paymentResponse = await fetch("/api/cashfree-create-order", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    targetExam,
-    fullName,
-    email,
-    phone,
-    studentId
-  })
-});
-
-const paymentData = await paymentResponse.json();
-
-if (!paymentResponse.ok || !paymentData.success) {
-  message(
-    paymentData.error || "Unable to start Cashfree payment.",
-    true
-  );
-  return;
-}
-
-if (
-  !window.Cashfree
-) {
-  message(
-    "Cashfree Checkout could not be loaded.",
-    true
-  );
-  return;
-}
-
-const cashfree = Cashfree({
-  mode: "sandbox"
-});
-
-let paymentVerified = false;
-
-const verifyCashfreePayment = async function () {
-
-  for (let attempt = 1; attempt <= 10; attempt++) {
-
-    try {
-
-      const verifyResponse = await fetch(
-        "/api/cashfree-verify-payment",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            orderId: paymentData.orderId,
-            expectedAmount: paymentData.amount
-          })
-        }
-      );
-
-      const verifyData = await verifyResponse.json();
-
-      if (verifyData.success) {
-        paymentVerified = true;
-        return;
-      }
-
-    } catch (error) {
-
-      console.error(
-        "Cashfree payment verification error:",
-        error
-      );
-
-    }
-
-    if (attempt < 10) {
-      await new Promise(resolve =>
-        setTimeout(resolve, 2000)
-      );
-    }
-  }
-};
-
-  if (!paymentVerified) {
-    message(
-      "Payment was not completed or could not be verified.",
-      true
-    );
-    return;
-  }
-
-  message(
-    "Payment successful. Creating your student account...",
-    false
-  );
-
-  // ---------- PAYMENT SUCCESS ----------
-  // Existing Supabase signup continues below.
-
-
-try {
-  await cashfree.checkout({
-    paymentSessionId: paymentData.paymentSessionId,
-    redirectTarget: "_modal"
-  });
-
-  await verifyCashfreePayment();
-} catch (error) {
-  console.error(
-    "Cashfree Checkout error:",
-    error
-  );
-
-  message(
-    "Cashfree payment was cancelled or could not be completed.",
-    true
-  );
-
-  return;
-}
-
-if (!paymentVerified) {
-  return;
-}
-
-message(
-  "Payment successful. Creating your student account...",
-  false
-);
-
-// ---------- PAYMENT SUCCESS ----------
-
-// Existing Supabase signup continues below
-      const {data,error}=await supabase.auth.signUp({
-        email:email,
-        password:password,
-       options:{
- data:{
-  full_name:fullName,
-  student_id:studentId,
-  phone:phone,
-  target_exam:targetExam,
-  batch:batch,
-  plan_name:planName,
-  plan_amount:planAmount,
-  plan_days:planDays
-}
-}
-      });
-
-      this.disabled=false;
-      this.textContent="Create Student Account";
-
-      if(error){
+      this.textContent="Submitting...";
+      try{
+        const response=await fetch("/api/payment-requests",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({fullName,studentId,email,phone,targetExam,batch,utrNumber})
+        });
+        const result=await response.json();
+        if(!response.ok) throw new Error(result.error||"Unable to submit the payment request.");
+        paymentRequestPanel.style.display="none";
+        message("Payment request submitted for ₹"+result.amount+". It is pending admin review. After approval, we’ll email a link to set your password.");
+        this.textContent="Request submitted";
+        this.disabled=true;
+      }catch(error){
         message(error.message,true);
-        return;
-      }
-
-      if(data.user){
-
-        if(data.session){
-
-          await updateProfile(data.user);
-          await showProfile(data.user);
-
-          message(
-            "Student account created successfully."
-          );
-
-        }else{
-
-          message(
-            "Account created successfully. Check your email, confirm your account, then login."
-          );
-
-        }
+        this.disabled=false;
+        this.textContent="Submit payment request";
       }
     };
 
@@ -4304,6 +4146,93 @@ if (answerKey) {
     "ASTHIRA mixed question paper generator connected ✓"
   );
 
+})();
+</script>
+<script>
+(function(){
+  function addButton(){
+    const sb=window.supabaseClient;
+    const bar=document.querySelector(".dashboard .toolbar");
+    if(!sb||!bar||document.getElementById("paymentRequestsAdminBtn"))return;
+    sb.auth.getSession().then(async function(result){
+      const session=result.data&&result.data.session;
+      if(!session)return;
+      const profile=await sb.from("profiles").select("role").eq("id",session.user.id).maybeSingle();
+      if(profile.data&&profile.data.role==="admin"){
+        const button=document.createElement("button");
+        button.id="paymentRequestsAdminBtn";
+        button.type="button";
+        button.className="tool";
+        button.textContent="💳 Payment Requests";
+        button.onclick=showRequests;
+        bar.appendChild(button);
+      }
+    }).catch(function(error){console.error("Admin payment button error:",error)});
+  }
+
+  async function api(path, options){
+    const sb=window.supabaseClient;
+    const result=await sb.auth.getSession();
+    const token=result.data&&result.data.session&&result.data.session.access_token;
+    if(!token)throw new Error("Please sign in as an administrator.");
+    const response=await fetch(path,Object.assign({},options||{},{headers:Object.assign({"Authorization":"Bearer "+token,"Content-Type":"application/json"},(options&&options.headers)||{})}));
+    const data=await response.json();
+    if(!response.ok)throw new Error(data.error||"Payment request action failed.");
+    return data;
+  }
+
+  function node(tag, text, className){
+    const el=document.createElement(tag);
+    if(text!==undefined)el.textContent=text;
+    if(className)el.className=className;
+    return el;
+  }
+
+  async function showRequests(){
+    const content=document.getElementById("dashboardContent");
+    if(!content)return;
+    content.textContent="Loading payment requests…";
+    try{
+      const result=await api("/api/payment-requests");
+      content.replaceChildren(node("b","💳 Pending Payment Requests"));
+      const pending=(result.requests||[]).filter(function(request){return request.status==="pending";});
+      if(!pending.length){content.appendChild(node("div","No pending payment requests.","bank-item"));return;}
+      pending.forEach(function(request){
+        const card=node("div",undefined,"bank-item");
+        const title=node("b",request.full_name+" • "+request.student_id);
+        const details=node("div",undefined,"small");
+        details.textContent=[request.email,request.phone,request.target_exam,request.plan_name+" ₹"+request.plan_amount+" / "+request.plan_days+" days","UTR: "+request.utr_number,"Submitted: "+new Date(request.created_at).toLocaleString()].filter(Boolean).join("\n");
+        details.style.whiteSpace="pre-line";
+        const controls=node("div",undefined,"toolbar");
+        const approve=node("button","Approve & send setup link","primary");
+        approve.type="button";
+        approve.onclick=function(){review(request.id,"approve",approve);};
+        const reject=node("button","Reject","tool");
+        reject.type="button";
+        reject.onclick=function(){review(request.id,"reject",reject);};
+        controls.append(approve,reject);
+        card.append(title,details,controls);
+        content.appendChild(card);
+      });
+    }catch(error){content.textContent=error.message;}
+  }
+
+  async function review(id, action, button){
+    const verb=action==="approve"?"approve this request and email an account setup link":"reject this request";
+    if(!window.confirm("Are you sure you want to "+verb+"?"))return;
+    button.disabled=true;
+    try{
+      await api("/api/payment-requests?action=review",{method:"POST",body:JSON.stringify({requestId:id,action:action})});
+      await showRequests();
+    }catch(error){alert(error.message);button.disabled=false;}
+  }
+
+  let tries=0;
+  const timer=setInterval(function(){
+    addButton();
+    if(document.getElementById("paymentRequestsAdminBtn")||++tries>120)clearInterval(timer);
+  },1000);
+  document.addEventListener("visibilitychange",function(){if(!document.hidden)addButton();});
 })();
 </script>
 </body>
